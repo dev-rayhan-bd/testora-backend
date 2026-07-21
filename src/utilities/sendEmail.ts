@@ -29,16 +29,14 @@ const sendMail = async ({ from, to, subject, html }: MailOptions): Promise<boole
       html,
     };
 
-    setImmediate(async () => {
+
       try {
         await transporter.sendMail(mailOptions);
         console.log(`Email sent to ${to}`);
       } catch (err) {
         console.error(`Email failed for ${to}:`, err);
-        // optionally, retry once after a delay
-        setTimeout(async () => await transporter.sendMail(mailOptions), 5000);
       }
-    });
+
 
     // Wait for the sendMail operation to complete
     // const info: SentMessageInfo = await transporter.sendMail(mailOptions);

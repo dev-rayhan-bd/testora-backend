@@ -15,7 +15,6 @@ dist/
 
 
 # IDE/editor specific files
-.vscode/
 
 # NPM packages & cache
 npm-debug.log*
@@ -35,3 +34,7 @@ uploads/
 
 # Test coverage reports
 coverage/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
