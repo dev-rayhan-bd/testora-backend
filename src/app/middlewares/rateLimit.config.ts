@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import logger from '../../config/logger';
 
 type RequestCount = {
@@ -19,6 +19,7 @@ export const applyRateLimit = () =>
     limit: 200,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
+    validate: { ip: false },
     message: {
       statusCode: 429,
       error: 'Too Many Requests',
@@ -26,8 +27,7 @@ export const applyRateLimit = () =>
     },
     skip: (req: Request) => trustedIPs.includes(req.ip as string),
     keyGenerator: (req: Request) => {
-      const rawIP = req.ip ?? ''; // fallback if undefined
-      const ip = rawIP.replace('::ffff:', ''); // Normalize IPv4 from IPv6 format
+      const ip = ipKeyGenerator(req.ip ?? ''); // Handle both IPv4 and IPv6
       const path = req.path;
       const now = new Date();
 

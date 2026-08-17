@@ -19,5 +19,12 @@
     "type": "shell",
     "command": "npm run lint",
     "runOn": "folderOpen"
-  }
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["tsconfig*.json"],
+      "url": "https://json.schemastore.org/tsconfig"
+    }
+  ],
+  "typescript.tsserver.log": "off"
 }
