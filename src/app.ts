@@ -35,10 +35,14 @@ app.use(
       'http://localhost:3001',
       'http://localhost:3000',
       'http://localhost:3002',
+      'http://10.10.28.81:3000',
+      'http://10.10.28.81:3001',
+      'http://10.10.28.81:3002',
       'https://testora-dashboard.vercel.app',
       'https://testora-dashboards.vercel.app',
       'https://testora-frontend.vercel.app'
     ],
+    credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
   }),
 );

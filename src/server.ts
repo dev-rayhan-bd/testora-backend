@@ -22,14 +22,11 @@ const runServer = async () => {
 
     initializeQuizCrons();
 
-    const host =
-      process.env.NODE_ENV === 'production'
-        ? '0.0.0.0'
-        : config.base_url || 'localhost';
+    const host = '0.0.0.0';
 
     server = app.listen(config.server_port || 5002, host, () => {
       console.log(
-        `\x1b[33mServer is listening on port http://${host}:${config.server_port || 5020}\x1b[0m`,
+        `\x1b[33mServer is listening on port http://${host}:${config.server_port || 5002}\x1b[0m`,
       );
     });
 

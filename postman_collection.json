@@ -1,0 +1,2746 @@
+{
+  "info": {
+    "_postman_id": "e-learning-api-collection-v1",
+    "name": "E-Learning Platform API (Production & Dashboard)",
+    "description": "Complete, production-ready Postman collection for E-Learning API.\n\n### Features:\n- Modular feature-wise organization\n- Dedicated Admin Dashboard suite\n- Automated JWT Token Management for both Student & Admin\n- Dynamic variable capture for testId, sessionId, facultyId, etc.\n- Pre-configured headers, query parameters, and JSON / Form-Data payloads",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl_root",
+      "value": "http://10.10.28.81:5009",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://10.10.28.81:5009/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "studentEmail",
+      "value": "student@example.com",
+      "type": "string"
+    },
+    {
+      "key": "studentPassword",
+      "value": "Student123@",
+      "type": "string"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin123@",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d2",
+      "type": "string"
+    },
+    {
+      "key": "questionId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d3",
+      "type": "string"
+    },
+    {
+      "key": "facultyId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d4",
+      "type": "string"
+    },
+    {
+      "key": "departmentId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d5",
+      "type": "string"
+    },
+    {
+      "key": "subjectId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d6",
+      "type": "string"
+    },
+    {
+      "key": "passageId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d7",
+      "type": "string"
+    },
+    {
+      "key": "blogId",
+      "value": "64f1a2b3c4d5e6f7a8b9c0d8",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Health & System",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "Server Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl_root}}/health_check",
+              "host": [
+                "{{baseUrl_root}}"
+              ],
+              "path": [
+                "health_check"
+              ]
+            },
+            "description": "Verify server health and availability."
+          }
+        },
+        {
+          "name": "Root Page / HTML Design",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl_root}}/",
+              "host": [
+                "{{baseUrl_root}}"
+              ],
+              "path": []
+            },
+            "description": "Get root welcome page."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01. Authentication & Security",
+      "auth": {
+        "type": "noauth"
+      },
+      "description": "User registration, login, OTP verification, password reset, and automatic token management.",
+      "item": [
+        {
+          "name": "Register Student Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Arben Krasniqi\",\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\",\n  \"city\": \"Pristina\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "create"
+              ]
+            },
+            "description": "Register a new student account. Password requires 1 uppercase, 1 lowercase, 1 number, 1 special character."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 or 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set(\"userId\", res.data._id);",
+                  "    console.log(\"Registered userId saved:\", res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Student) [Auto-Saves {{token}}]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\",\n  \"fcmToken\": \"fcm_sample_device_token_student\",\n  \"isRemembered\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login as student. On success, automatically saves accessToken to {{token}} and refreshToken to {{refreshToken}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", res.data.refreshToken);",
+                  "    console.log(\"Student Access Token successfully saved to {{token}}!\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Admin) [Auto-Saves {{adminToken}}]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\",\n  \"fcmToken\": \"fcm_sample_device_token_admin\",\n  \"isRemembered\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login as Administrator / Super Admin. On success, automatically saves accessToken to {{adminToken}} and refreshToken to {{adminRefreshToken}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"adminToken\", res.data.accessToken);",
+                  "    pm.collectionVariables.set(\"adminRefreshToken\", res.data.refreshToken);",
+                  "    console.log(\"Admin Access Token successfully saved to {{adminToken}}!\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Social Login (Google / Apple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"token\": \"sample_oauth_google_identity_token\",\n  \"fcmToken\": \"fcm_sample_token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/social-login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "social-login"
+              ]
+            },
+            "description": "Login using Google or Apple OAuth token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", res.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"otp\": \"123456\",\n  \"fcmToken\": \"optional_fcm_token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "description": "Verify 6-digit email OTP after registration. Automatically sets token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", res.data.refreshToken);",
+                  "    console.log(\"Verified & Token Saved!\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend Verification OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-otp"
+              ]
+            },
+            "description": "Resend email verification code."
+          }
+        },
+        {
+          "name": "Forgot Password - Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Trigger a password reset OTP to email."
+          }
+        },
+        {
+          "name": "Resend Reset Password OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password-otp"
+              ]
+            },
+            "description": "Resend password reset OTP."
+          }
+        },
+        {
+          "name": "Verify Forgot Password OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify",
+                "reset-password"
+              ]
+            },
+            "description": "Verify password reset OTP before setting a new password."
+          }
+        },
+        {
+          "name": "Reset Forgotten Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"NewSecurePassword123@\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Set a new password after OTP verification."
+          }
+        },
+        {
+          "name": "Change Password (Authenticated)",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"{{studentPassword}}\",\n  \"newPassword\": \"NewUpdatedPassword123@\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change current account password while authenticated."
+          }
+        },
+        {
+          "name": "Refresh Access Token (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "description": "Exchange refresh token for new access token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.accessToken);",
+                  "    console.log(\"New student access token saved!\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Access Token (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{adminRefreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "description": "Exchange admin refresh token for new access token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"adminToken\", res.data.accessToken);",
+                  "    console.log(\"New admin access token saved!\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. Student Profile & Settings",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Manage student profile, preferred language, avatar image, and exam plan selection.",
+      "item": [
+        {
+          "name": "Get Current Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user/get-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "get-profile"
+              ]
+            },
+            "description": "Retrieve logged-in student profile details."
+          }
+        },
+        {
+          "name": "Update Profile Info",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Arben Krasniqi Updated\",\n  \"city\": \"Tirana\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/update-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "update-profile"
+              ]
+            },
+            "description": "Update student full name and city."
+          }
+        },
+        {
+          "name": "Update Language Preference",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"english\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/update-language",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "update-language"
+              ]
+            },
+            "description": "Update preferred app language: \"english\" or \"albanian\"."
+          }
+        },
+        {
+          "name": "Update Profile Image",
+          "request": {
+            "method": "PATCH",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profile_image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Avatar image file (JPG, PNG, WEBP)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/update-profile-image",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "update-profile-image"
+              ]
+            },
+            "description": "Upload and update student avatar picture."
+          }
+        },
+        {
+          "name": "Choose Exam Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"provime\",\n  \"faculty\": \"{{facultyId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/choose-plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "choose-plan"
+              ]
+            },
+            "description": "Select student exam plan (e.g. \"semi_matura\", \"matura\", \"provime\") and faculty if provime."
+          }
+        },
+        {
+          "name": "Get Current Plan",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "plan"
+              ]
+            },
+            "description": "Retrieve chosen exam plan and faculty for current student."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Student Dashboard (Home)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Analytics, exam readiness calculation, in-progress sessions, and weak topics.",
+      "item": [
+        {
+          "name": "Get Exam Readiness Score",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/home/dashboard/exam-readiness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home",
+                "dashboard",
+                "exam-readiness"
+              ]
+            },
+            "description": "Returns student preparedness score and percentage."
+          }
+        },
+        {
+          "name": "Get In-Progress Quiz Sessions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/home/dashboard/in-progress-sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home",
+                "dashboard",
+                "in-progress-sessions"
+              ]
+            },
+            "description": "Retrieve any incomplete or active quiz sessions."
+          }
+        },
+        {
+          "name": "Get Recent Activity",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/home/dashboard/recent-activity",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home",
+                "dashboard",
+                "recent-activity"
+              ]
+            },
+            "description": "Recent test attempts and quiz performance history."
+          }
+        },
+        {
+          "name": "Get Active Subscription Plan",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/home/dashboard/subscription-plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home",
+                "dashboard",
+                "subscription-plan"
+              ]
+            },
+            "description": "Details of the active user subscription plan."
+          }
+        },
+        {
+          "name": "Get Weak Topics & Recommendations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/home/dashboard/weak-topics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home",
+                "dashboard",
+                "weak-topics"
+              ]
+            },
+            "description": "AI-driven weak topics analysis for targeted practice."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Quiz & Simulation Engine",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Start simulation quizzes, custom practice tests, complete quizzes, review questions, and view result summaries.",
+      "item": [
+        {
+          "name": "Get Official Quizzes List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/official",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "official"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "examType",
+                  "value": "matura"
+                },
+                {
+                  "key": "year",
+                  "value": "2024"
+                }
+              ]
+            },
+            "description": "Retrieve paginated official exams for the student."
+          }
+        },
+        {
+          "name": "Get Additional Quizzes List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/additional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "additional"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "examType",
+                  "value": "provime"
+                }
+              ]
+            },
+            "description": "Retrieve paginated additional practice tests."
+          }
+        },
+        {
+          "name": "Get Mandatory Subjects for Test",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/subjects/{{testId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "subjects",
+                "{{testId}}"
+              ]
+            },
+            "description": "Fetch required subjects for a specific test simulation."
+          }
+        },
+        {
+          "name": "Start Full Simulation Quiz [Saves {{sessionId}}]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjects\": [\n    \"{{subjectId}}\"\n  ],\n  \"departments\": [\n    \"{{departmentId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/quiz/start-full-simulation/{{testId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "start-full-simulation",
+                "{{testId}}"
+              ]
+            },
+            "description": "Start a timed official full simulation exam. Automatically saves sessionId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Quiz started\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && (res.data._id || res.data.sessionId)) {",
+                  "    var sId = res.data._id || res.data.sessionId;",
+                  "    pm.collectionVariables.set(\"sessionId\", sId);",
+                  "    console.log(\"Saved active sessionId:\", sId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Custom Practice Quiz [Saves {{sessionId}}]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"year\": 2024,\n  \"subjectIds\": [\n    \"{{subjectId}}\"\n  ],\n  \"facultyId\": \"{{facultyId}}\",\n  \"departmentIds\": [\n    \"{{departmentId}}\"\n  ],\n  \"questionCount\": 15\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/quiz/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "start"
+              ]
+            },
+            "description": "Start a personalized practice quiz session."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && (res.data._id || res.data.sessionId)) {",
+                  "    var sId = res.data._id || res.data.sessionId;",
+                  "    pm.collectionVariables.set(\"sessionId\", sId);",
+                  "    console.log(\"Saved practice sessionId:\", sId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Quiz Map / Question Statuses",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/map/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "map",
+                "{{sessionId}}"
+              ]
+            },
+            "description": "View the overview map of all questions in this session (answered, unanswered, skipped)."
+          }
+        },
+        {
+          "name": "Get Active Session Status",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/session-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "session-status"
+              ]
+            },
+            "description": "Check active timer and state for student current session."
+          }
+        },
+        {
+          "name": "Complete / Submit Quiz Session",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/complete/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "complete",
+                "{{sessionId}}"
+              ]
+            },
+            "description": "Finalize quiz session and calculate final score."
+          }
+        },
+        {
+          "name": "Get Quiz Summary & Score Report",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/quiz/summary/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "summary",
+                "{{sessionId}}"
+              ]
+            },
+            "description": "Retrieve summary statistics, accuracy, correct and incorrect answer counts."
+          }
+        },
+        {
+          "name": "Review Quiz Questions & Solutions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"index\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/quiz/review/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quiz",
+                "review",
+                "{{sessionId}}"
+              ]
+            },
+            "description": "Review question details, chosen option, correct option, and explanation by question index."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Test Archive (Student Access)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Public & student browse endpoints for past official and additional exams.",
+      "item": [
+        {
+          "name": "Get All Official Tests",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/test-archive/official",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-archive",
+                "official"
+              ]
+            },
+            "description": "List all past official tests in the archive."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                  "    pm.collectionVariables.set(\"testId\", res.data[0]._id);",
+                  "    console.log(\"Saved testId from official tests list:\", res.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Additional Practice Tests",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/test-archive/additional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-archive",
+                "additional"
+              ]
+            },
+            "description": "List extra practice test packages."
+          }
+        },
+        {
+          "name": "Get Available Year Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/test-archive/year-range",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-archive",
+                "year-range"
+              ]
+            },
+            "description": "Retrieve min and max years of available exams in the archive."
+          }
+        },
+        {
+          "name": "Get Questions of a Test",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/test-archive/questions/{{testId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-archive",
+                "questions",
+                "{{testId}}"
+              ]
+            },
+            "description": "Fetch all questions belonging to a specific archived test."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Academic Hierarchy (Browse)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Retrieve universities, faculties, departments, and academic subjects.",
+      "item": [
+        {
+          "name": "Get All Faculties",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/faculty/retrieve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "faculty",
+                "retrieve"
+              ]
+            },
+            "description": "Retrieve list of all faculties."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                  "    pm.collectionVariables.set(\"facultyId\", res.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Departments by Faculty ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/department/retrieve/{{facultyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "department",
+                "retrieve",
+                "{{facultyId}}"
+              ]
+            },
+            "description": "Retrieve departments under a specific faculty."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                  "    pm.collectionVariables.set(\"departmentId\", res.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Subjects by Exam Type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/subject/by-exam-type",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject",
+                "by-exam-type"
+              ]
+            },
+            "description": "Retrieve subjects relevant to student current exam type."
+          }
+        },
+        {
+          "name": "Get Subjects by Departments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departments\": [\n    \"{{departmentId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subject/by-departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject",
+                "by-departments"
+              ]
+            },
+            "description": "Retrieve subjects mapped to one or more department IDs."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Dynamic Content & Legal Pages",
+      "description": "Retrieve static pages such as Terms, Privacy Policy, and About Us.",
+      "item": [
+        {
+          "name": "Get Content by Type (Public/Student)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/content/retrieve/terms-and-condition",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "content",
+                "retrieve",
+                "terms-and-condition"
+              ]
+            },
+            "description": "Fetch content by type: \"about-us\", \"privacy-policy\", or \"terms-and-condition\"."
+          }
+        },
+        {
+          "name": "Get All Content Pages (Admin View)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/content/retrieve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "content",
+                "retrieve"
+              ]
+            },
+            "description": "Retrieve all dynamic pages (Admin)."
+          }
+        },
+        {
+          "name": "Create or Update Page Content (Admin)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"terms-and-condition\",\n  \"title\": \"Terms and Conditions\",\n  \"content\": \"<h1>Terms and Conditions</h1><p>Welcome to Testora e-learning platform. By using our service you agree to the following terms...</p>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/content/create-or-update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "content",
+                "create-or-update"
+              ]
+            },
+            "description": "Admin creates or updates a content page."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Blogs & Articles",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Articles, study guides, and tips for exam preparation.",
+      "item": [
+        {
+          "name": "Get Blog List (Filtered & Paginated)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/blog/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "blog",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "category",
+                  "value": "Matura"
+                },
+                {
+                  "key": "status",
+                  "value": "published"
+                },
+                {
+                  "key": "searchTerm",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "List blog posts with filters for category, status, and search query."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                  "    pm.collectionVariables.set(\"blogId\", res.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Blog Details by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/blog/details/{{blogId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "blog",
+                "details",
+                "{{blogId}}"
+              ]
+            },
+            "description": "View single blog post details."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Admin Dashboard (Exclusive Suite)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adminToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Complete management suite for Super Admins and Admins.\nAll requests in this folder automatically use {{adminToken}}.",
+      "item": [
+        {
+          "name": "Admin Profile",
+          "item": [
+            {
+              "name": "Get Admin Profile (/get-me)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/get-me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "get-me"
+                  ]
+                },
+                "description": "Fetch authenticated admin profile information."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Overview & Analytics",
+          "item": [
+            {
+              "name": "Get High-Level Stats Overview",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/overview/stats",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "overview",
+                    "stats"
+                  ]
+                },
+                "description": "Platform KPIs: total users, active users, total exams, pass rates, etc."
+              }
+            },
+            {
+              "name": "Get Monthly User Growth",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/overview/user-growth",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "overview",
+                    "user-growth"
+                  ],
+                  "query": [
+                    {
+                      "key": "year",
+                      "value": "2026"
+                    }
+                  ]
+                },
+                "description": "User registration growth chart data aggregated by month."
+              }
+            },
+            {
+              "name": "Get Recent Active Users",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/overview/recent-active-users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "overview",
+                    "recent-active-users"
+                  ]
+                },
+                "description": "List of recently active users on the platform."
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Management",
+          "item": [
+            {
+              "name": "Get User Stats Summary",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/overview",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    "overview"
+                  ]
+                },
+                "description": "Total users, active, blocked, and disabled accounts count."
+              }
+            },
+            {
+              "name": "Get All Users (Filtered & Paginated)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/list",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    "list"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": "active"
+                    },
+                    {
+                      "key": "plan",
+                      "value": "provime"
+                    }
+                  ]
+                },
+                "description": "Paginated user directory with search and filtering by status and plan."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Academic Structure Setup",
+          "item": [
+            {
+              "name": "Create Faculty [Saves {{facultyId}}]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Faculty of Computer Science & Engineering\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/faculty/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "faculty",
+                    "add"
+                  ]
+                },
+                "description": "Admin creates a new faculty."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"facultyId\", res.data._id);",
+                      "    console.log(\"Saved newly created facultyId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Create Department [Saves {{departmentId}}]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Software Engineering\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/department/add/{{facultyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "department",
+                    "add",
+                    "{{facultyId}}"
+                  ]
+                },
+                "description": "Admin adds a department under a faculty."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"departmentId\", res.data._id);",
+                      "    console.log(\"Saved newly created departmentId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Create Subject [Saves {{subjectId}}]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Mathematics\",\n  \"examType\": \"matura\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/subject/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "subject",
+                    "add"
+                  ]
+                },
+                "description": "Admin creates an academic subject (examType: semi_matura, matura, provime)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"subjectId\", res.data._id);",
+                      "    console.log(\"Saved newly created subjectId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Subjects by Exam Type (Admin)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/subject/retrieve",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "subject",
+                    "retrieve"
+                  ],
+                  "query": [
+                    {
+                      "key": "examType",
+                      "value": "matura"
+                    }
+                  ]
+                },
+                "description": "Admin fetches subjects filtered by examType."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Question Bank Management",
+          "item": [
+            {
+              "name": "Get Questions Overview Stats",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/overview",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "overview"
+                  ]
+                },
+                "description": "Statistics on total questions, exam types, drafts, and published questions."
+              }
+            },
+            {
+              "name": "Get Questions List (Dashboard Filtered)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "examType",
+                      "value": "matura"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2024"
+                    },
+                    {
+                      "key": "status",
+                      "value": "published"
+                    },
+                    {
+                      "key": "access",
+                      "value": "free"
+                    },
+                    {
+                      "key": "difficultyLevel",
+                      "value": "medium"
+                    }
+                  ]
+                },
+                "description": "Advanced search and filtering for questions bank."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                      "    pm.collectionVariables.set(\"questionId\", res.data[0]._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Single Question by ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/single/{{questionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "single",
+                    "{{questionId}}"
+                  ]
+                },
+                "description": "Retrieve full question details including options, explanation, and tags."
+              }
+            },
+            {
+              "name": "Create Question - Matura/Semi-Matura (Form-Data)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "examType",
+                      "value": "matura",
+                      "type": "text"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2024",
+                      "type": "text"
+                    },
+                    {
+                      "key": "subject",
+                      "value": "{{subjectId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "testType",
+                      "value": "official",
+                      "type": "text"
+                    },
+                    {
+                      "key": "access",
+                      "value": "free",
+                      "type": "text"
+                    },
+                    {
+                      "key": "source",
+                      "value": "both",
+                      "type": "text"
+                    },
+                    {
+                      "key": "questionText",
+                      "value": "What is the derivative of f(x) = x^2 + 3x?",
+                      "type": "text"
+                    },
+                    {
+                      "key": "options",
+                      "value": "[{\"text\":\"2x + 3\"},{\"text\":\"x + 3\"},{\"text\":\"2x\"},{\"text\":\"3x^2\"}]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "correctOptionIndex",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "explanation",
+                      "value": "Using power rule: d/dx(x^2) = 2x and d/dx(3x) = 3.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "status",
+                      "value": "published",
+                      "type": "text"
+                    },
+                    {
+                      "key": "question_image",
+                      "type": "file",
+                      "src": [],
+                      "description": "Optional question illustration"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/question/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "question",
+                    "add"
+                  ]
+                },
+                "description": "Create a new question for Matura/Semi-matura (requires subject, forbids faculty/department)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"questionId\", res.data._id);",
+                      "    console.log(\"Saved created questionId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Create Question - Entrance Exam / Provime (Form-Data)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "examType",
+                      "value": "provime",
+                      "type": "text"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2024",
+                      "type": "text"
+                    },
+                    {
+                      "key": "faculty",
+                      "value": "{{facultyId}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "departments",
+                      "value": "[\"{{departmentId}}\"]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "testType",
+                      "value": "official",
+                      "type": "text"
+                    },
+                    {
+                      "key": "access",
+                      "value": "premium",
+                      "type": "text"
+                    },
+                    {
+                      "key": "source",
+                      "value": "both",
+                      "type": "text"
+                    },
+                    {
+                      "key": "questionText",
+                      "value": "Which algorithm has worst-case time complexity of O(n log n)?",
+                      "type": "text"
+                    },
+                    {
+                      "key": "options",
+                      "value": "[{\"text\":\"Merge Sort\"},{\"text\":\"Bubble Sort\"},{\"text\":\"Insertion Sort\"},{\"text\":\"Quick Sort\"}]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "correctOptionIndex",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "explanation",
+                      "value": "Merge Sort always runs in O(n log n) in worst case.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "status",
+                      "value": "published",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/question/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "question",
+                    "add"
+                  ]
+                },
+                "description": "Create entrance exam question (requires faculty & departments, forbids subject)."
+              }
+            },
+            {
+              "name": "Create Questions in Batch (/question/add/many)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "[{\"examType\":\"matura\",\"year\":2024,\"subject\":\"{{subjectId}}\",\"testType\":\"official\",\"access\":\"free\",\"source\":\"both\",\"questionText\":\"Batch Question Sample 1\",\"options\":[{\"text\":\"Answer A\"},{\"text\":\"Answer B\"}],\"correctOptionIndex\":0,\"status\":\"published\"}]",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/question/add/many",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "question",
+                    "add",
+                    "many"
+                  ]
+                },
+                "description": "Batch upload multiple questions at once."
+              }
+            },
+            {
+              "name": "Fetch Questions by Filter (/question/fetch)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/question/fetch",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "question",
+                    "fetch"
+                  ],
+                  "query": [
+                    {
+                      "key": "examType",
+                      "value": "matura"
+                    }
+                  ]
+                },
+                "description": "Fetch questions grouped by exam type and subjects."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reading Passage Management",
+          "item": [
+            {
+              "name": "Create Passage (Dashboard Route)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "passageCode",
+                      "value": "PSG-ENG-2024-01",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title",
+                      "value": "The Evolution of Artificial Intelligence",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content",
+                      "value": "Artificial Intelligence has transformed various industries over the last decade...",
+                      "type": "text"
+                    },
+                    {
+                      "key": "passage_image",
+                      "type": "file",
+                      "src": [],
+                      "description": "Optional passage image"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/passage/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "passage",
+                    "add"
+                  ]
+                },
+                "description": "Add a reading comprehension passage for passage-based questions."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"passageId\", res.data._id);",
+                      "    console.log(\"Saved passageId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Create Passage (Passage Module Route)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "passageCode",
+                      "value": "PSG-ALB-2024-02",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title",
+                      "value": "Historia dhe Gjuha Shqipe",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content",
+                      "value": "Gjuha shqipe përbën një degë të veçantë në familjen indoevropiane...",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/passage/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "passage",
+                    "add"
+                  ]
+                },
+                "description": "Alternative route to add reading passage."
+              }
+            },
+            {
+              "name": "Get All Passages",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/passages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "passages"
+                  ]
+                },
+                "description": "Retrieve all reading comprehension passages."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                      "    pm.collectionVariables.set(\"passageId\", res.data[0]._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Test Archive Management",
+          "item": [
+            {
+              "name": "Create Test Archive Entry [Saves {{testId}}]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Official Matura Exam June 2024\",\n  \"examType\": \"matura\",\n  \"year\": 2024,\n  \"testType\": \"official\",\n  \"access\": \"free\",\n  \"totalSubjects\": 1,\n  \"subjectss\": [\n    \"{{subjectId}}\"\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/test-archive/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "test-archive",
+                    "add"
+                  ]
+                },
+                "description": "Admin publishes a complete archived test into the system."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"testId\", res.data._id);",
+                      "    console.log(\"Saved newly created testId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Test Archive List (Dashboard View)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/test-archive",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "test-archive"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "examType",
+                      "value": "matura"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2024"
+                    }
+                  ]
+                },
+                "description": "List tests with administration filters."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk CSV Imports",
+          "item": [
+            {
+              "name": "Import Questions CSV (Question Route)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": [],
+                      "description": "Upload questions CSV file"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/question/import",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "question",
+                    "import"
+                  ]
+                },
+                "description": "Upload CSV file containing questions in bulk."
+              }
+            },
+            {
+              "name": "Import Tests & Questions CSV (Archive Route)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": [],
+                      "description": "Upload CSV containing tests with questions"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/test-archive/import-csv",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "test-archive",
+                    "import-csv"
+                  ]
+                },
+                "description": "Import full tests and their associated questions via CSV."
+              }
+            },
+            {
+              "name": "Import Tests CSV (Dashboard Route)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": [],
+                      "description": "Upload CSV file"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/import-csv",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "import-csv"
+                  ]
+                },
+                "description": "Dashboard route for importing CSV tests."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Blog Management (Admin CRUD)",
+          "item": [
+            {
+              "name": "Create New Blog Post [Saves {{blogId}}]",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "title",
+                      "value": "Top 10 Strategies to Ace the Matura Exam 2024",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content",
+                      "value": "<p>Preparation is key to achieving top percentiles in the Matura Exam. Here are the top 10 tips...</p>",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category",
+                      "value": "Matura",
+                      "type": "text"
+                    },
+                    {
+                      "key": "seoTitle",
+                      "value": "Top 10 Strategies to Ace the Matura Exam",
+                      "type": "text"
+                    },
+                    {
+                      "key": "seoDescription",
+                      "value": "Complete guide and proven study strategies for Matura preparation.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "status",
+                      "value": "published",
+                      "type": "text"
+                    },
+                    {
+                      "key": "blog_image",
+                      "type": "file",
+                      "src": [],
+                      "description": "Feature banner image"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/blog/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "blog",
+                    "add"
+                  ]
+                },
+                "description": "Admin creates and publishes an educational blog post."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"blogId\", res.data._id);",
+                      "    console.log(\"Saved created blogId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Blog Post",
+              "request": {
+                "method": "PUT",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "title",
+                      "value": "Updated: Top 10 Strategies to Ace the Matura Exam 2024",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content",
+                      "value": "<p>Updated content with latest syllabus additions...</p>",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category",
+                      "value": "Matura",
+                      "type": "text"
+                    },
+                    {
+                      "key": "status",
+                      "value": "published",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/blog/update/{{blogId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "blog",
+                    "update",
+                    "{{blogId}}"
+                  ]
+                },
+                "description": "Update existing blog post."
+              }
+            },
+            {
+              "name": "Get All Blogs (Admin View)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/blog/list",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "blog",
+                    "list"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Admin view of all blogs, including drafts and hidden posts."
+              }
+            },
+            {
+              "name": "Get Blog Details (Admin View)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/blog/details/{{blogId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "blog",
+                    "details",
+                    "{{blogId}}"
+                  ]
+                },
+                "description": "View full blog record with analytics."
+              }
+            },
+            {
+              "name": "Delete Blog Post",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/blog/delete/{{blogId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "blog",
+                    "delete",
+                    "{{blogId}}"
+                  ]
+                },
+                "description": "Permanently remove a blog post."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
