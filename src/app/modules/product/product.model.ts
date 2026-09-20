@@ -8,7 +8,6 @@ const productVariantSchema = new Schema<IProductVariant>(
   {
     sku: {
       type: String,
-      required: [true, 'Variant SKU is required'],
       trim: true,
       uppercase: true,
     },
@@ -28,6 +27,17 @@ const productVariantSchema = new Schema<IProductVariant>(
       type: Number,
       default: null,
       min: [0, 'Variant compare at price must be non-negative'],
+    },
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    savingsAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     stock: {
       type: Number,
@@ -84,6 +94,17 @@ const productSchema = new Schema<IProductDocument, IProductModel>(
       type: Number,
       default: null,
       min: [0, 'Compare at price must be non-negative'],
+    },
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    savingsAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     stock: {
       type: Number,
@@ -231,6 +252,33 @@ productSchema.pre('save', async function () {
         const colorPart = v.color ? `-${v.color.substring(0, 3).toUpperCase()}` : '';
         const sizePart = v.size ? `-${v.size.substring(0, 3).toUpperCase()}` : '';
         v.sku = `${this.sku}${colorPart}${sizePart}-${i + 1}`;
+      }
+    }
+  }
+
+  // 5. Auto-calculate discount percentage and savings for Base Product
+  if (this.compareAtPrice && this.compareAtPrice > this.price) {
+    this.discountPercentage = Math.round(
+      ((this.compareAtPrice - this.price) / this.compareAtPrice) * 100,
+    );
+    this.savingsAmount = Number((this.compareAtPrice - this.price).toFixed(2));
+  } else {
+    this.discountPercentage = 0;
+    this.savingsAmount = 0;
+  }
+
+  // 6. Auto-calculate discount percentage and savings for Variants
+  if (this.variants && this.variants.length > 0) {
+    for (const v of this.variants) {
+      const variantPrice = v.price ?? this.price;
+      if (v.compareAtPrice && v.compareAtPrice > variantPrice) {
+        v.discountPercentage = Math.round(
+          ((v.compareAtPrice - variantPrice) / v.compareAtPrice) * 100,
+        );
+        v.savingsAmount = Number((v.compareAtPrice - variantPrice).toFixed(2));
+      } else {
+        v.discountPercentage = 0;
+        v.savingsAmount = 0;
       }
     }
   }

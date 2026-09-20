@@ -7,7 +7,7 @@ import couponZodSchema from './coupon.zod';
 
 const couponRouter = Router();
 
-// ── Public Storefront Route ──────────────────────────────────────────────────
+// ── Storefront Customer & Public Routes ──────────────────────────────────────
 /**
  * @route   POST /api/v1/coupons/validate
  * @desc    Validate a voucher code and calculate potential discount
@@ -21,17 +21,27 @@ couponRouter.post(
   couponController.validateCoupon,
 );
 
-// ── Admin Protected Routes ───────────────────────────────────────────────────
 /**
  * @route   GET /api/v1/coupons
- * @desc    Get all coupons (Admin)
- * @access  Admin & Super Admin
+ * @desc    Get available coupons for customers, or all coupons if admin
+ * @access  Public / Authenticated
  */
 couponRouter.get(
   '/',
-  authMiddleware(USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
   couponController.getAllCoupons,
 );
+
+/**
+ * @route   GET /api/v1/coupons/active
+ * @desc    Get all currently active promo coupons for students to browse and apply
+ * @access  Public / Student
+ */
+couponRouter.get(
+  '/active',
+  couponController.getAllCoupons,
+);
+
+// ── Admin Protected Routes ───────────────────────────────────────────────────
 
 /**
  * @route   GET /api/v1/coupons/:id

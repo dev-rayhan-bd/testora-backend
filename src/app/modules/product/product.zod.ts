@@ -172,10 +172,13 @@ const getProductsQuerySchema = z.object({
     .enum(['draft', 'active', 'hidden'])
     .optional(),
   category: z.string().trim().optional(),
+  brand: z.string().trim().optional(),
+  sku: z.string().trim().optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   inStock: z.enum(['true', 'false']).optional(),
   isLowStock: z.enum(['true', 'false']).optional(),
+  hasDiscount: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(10).optional(),
   sort: z.string().optional(),

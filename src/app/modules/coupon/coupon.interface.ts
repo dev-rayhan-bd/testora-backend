@@ -13,9 +13,11 @@ export interface ICoupon extends Document {
   startDate: Date;
   expiryDate: Date;
   usageLimit: number;
+  userUsageLimit: number;
   usedCount: number;
   isActive: boolean;
   isDeleted: boolean;
+  status?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -9,6 +9,8 @@ export interface IProductVariant {
   size?: string;
   price?: number;
   compareAtPrice?: number | null;
+  discountPercentage?: number;
+  savingsAmount?: number;
   stock: number;
   image?: string;
 }
@@ -21,6 +23,8 @@ export interface IProduct extends Document {
   description: string;
   price: number;
   compareAtPrice?: number | null;
+  discountPercentage: number;
+  savingsAmount: number;
   stock: number;
   status: TProductStatus;
   category: string;

@@ -13,6 +13,8 @@ import {
   IStockCheckResult,
 } from './product.interface';
 import Product from './product.model';
+import Order from '../order/order.model';
+import { ORDER_STATUS } from '../order/order.constant';
 import {
   TCreateProductPayload,
   TUpdateProductPayload,
@@ -87,9 +89,14 @@ const getAllProducts = async (
     filterConditions.status = query.status as string;
   }
 
-  // Category filter
+  // Category filter (supports both category ID and category name case-insensitively)
   if (query.category) {
-    filterConditions.category = query.category as string;
+    const catVal = String(query.category).trim();
+    if (Types.ObjectId.isValid(catVal)) {
+      filterConditions.category = catVal;
+    } else {
+      filterConditions.category = { $regex: new RegExp(catVal, 'i') };
+    }
   }
 
   // Dynamic Price Filtering (minPrice / maxPrice)
@@ -113,6 +120,26 @@ const getAllProducts = async (
     filterConditions.stock = 0;
   }
 
+  // Discount filter
+  if (query.hasDiscount === 'true') {
+    filterConditions.discountPercentage = { $gt: 0 };
+  } else if (query.hasDiscount === 'false') {
+    filterConditions.discountPercentage = 0;
+  }
+
+  // SKU exact filter
+  if (query.sku) {
+    filterConditions.$or = [
+      { sku: (query.sku as string).toUpperCase() },
+      { 'variants.sku': (query.sku as string).toUpperCase() },
+    ];
+  }
+
+  // Brand filter
+  if (query.brand) {
+    filterConditions.brand = query.brand as string;
+  }
+
   // Admin: Low Stock Alert Filter
   if (isAdmin && query.isLowStock === 'true') {
     filterConditions.$expr = { $lte: ['$stock', '$lowStockAlert'] };
@@ -124,7 +151,10 @@ const getAllProducts = async (
   delete cleanQuery.maxPrice;
   delete cleanQuery.inStock;
   delete cleanQuery.isLowStock;
+  delete cleanQuery.hasDiscount;
+  delete cleanQuery.sku;
   delete cleanQuery.category;
+  delete cleanQuery.brand;
   if (!isAdmin) {
     delete cleanQuery.status;
   }
@@ -225,31 +255,45 @@ const updateProduct = async (
     }
   }
 
-  const updatedProduct = await Product.findByIdAndUpdate(
-    id,
-    {
-      ...payload,
-      images: finalImages,
-      brand: PRODUCT_BRAND,
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  );
+  // Apply payload to existing document and save to trigger pre-save hooks (auto discount, slug, variants)
+  Object.assign(existingProduct, payload, {
+    images: finalImages,
+    brand: PRODUCT_BRAND,
+  });
 
-  return updatedProduct!;
+  const updatedProduct = await existingProduct.save();
+  return updatedProduct;
 };
 
 // ── 5. Soft-Delete Product ───────────────────────────────────────────────────
 const deleteProduct = async (id: string): Promise<IProductDocument> => {
+  const productObjectId = new Types.ObjectId(id);
+
   const product = await Product.findOne({
-    _id: new Types.ObjectId(id),
+    _id: productObjectId,
     isDeleted: false,
   });
 
   if (!product) {
     throw new NotFoundError('Product not found or already deleted.');
+  }
+
+  // Enterprise Guard: Check if product is part of any active/unfulfilled orders
+  const activeOrder = await Order.findOne({
+    'items.product': productObjectId,
+    orderStatus: {
+      $in: [
+        ORDER_STATUS.PENDING,
+        ORDER_STATUS.CONFIRMED,
+        ORDER_STATUS.SHIPPED,
+      ],
+    },
+  }).select('orderNumber orderStatus');
+
+  if (activeOrder) {
+    throw new BadRequestError(
+      `Cannot delete product '${product.title}'. It is currently part of an active order (${activeOrder.orderNumber}) with status '${activeOrder.orderStatus}'. Please complete, deliver, or cancel the order first.`,
+    );
   }
 
   product.isDeleted = true;

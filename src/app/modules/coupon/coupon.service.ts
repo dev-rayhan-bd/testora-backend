@@ -16,17 +16,50 @@ const createCoupon = async (payload: TCreateCouponPayload): Promise<ICoupon> => 
   return coupon;
 };
 
-const getAllCoupons = async (query: Record<string, unknown>, isAdmin = false) => {
+const getAllCoupons = async (
+  query: Record<string, unknown>,
+  isAdmin = false,
+  userId?: string,
+) => {
   const filter: Record<string, any> = {
     isDeleted: false,
   };
 
-  if (!isAdmin) {
-    filter.isActive = true;
-    filter.expiryDate = { $gte: new Date() };
+  const cleanQuery = { ...query };
+
+  // Support status query parameter ('active' | 'inactive' | 'expired')
+  if (cleanQuery.status !== undefined) {
+    const statusVal = String(cleanQuery.status).toLowerCase();
+    if (statusVal === 'active' || statusVal === 'true') {
+      filter.isActive = true;
+      filter.expiryDate = { $gte: new Date() };
+    } else if (statusVal === 'inactive' || statusVal === 'false') {
+      filter.isActive = false;
+    } else if (statusVal === 'expired') {
+      filter.expiryDate = { $lt: new Date() };
+    }
+    delete cleanQuery.status;
   }
 
-  const couponQuery = new QueryBuilder<ICoupon>(Coupon.find(filter), query)
+  // Support explicit isActive query parameter
+  if (cleanQuery.isActive !== undefined) {
+    filter.isActive = cleanQuery.isActive === 'true' || cleanQuery.isActive === true;
+    delete cleanQuery.isActive;
+  }
+
+  if (!isAdmin) {
+    if (filter.isActive === undefined) {
+      filter.isActive = true;
+    }
+    if (!filter.expiryDate) {
+      filter.expiryDate = { $gte: new Date() };
+    }
+    filter.startDate = { $lte: new Date() };
+    // Enterprise Filter: Never show coupons that reached global usage limit to customers
+    filter.$expr = { $lt: ['$usedCount', '$usageLimit'] };
+  }
+
+  const couponQuery = new QueryBuilder<ICoupon>(Coupon.find(filter), cleanQuery)
     .search(COUPON_SEARCHABLE_FIELDS)
     .filter()
     .sort()
@@ -36,6 +69,32 @@ const getAllCoupons = async (query: Record<string, unknown>, isAdmin = false) =>
   const data = await couponQuery.modelQuery;
   const meta = await couponQuery.countTotal();
 
+  let formattedData: any[] = data;
+
+  // If student is logged in, attach personal usage information
+  if (!isAdmin && userId) {
+    const Order = (await import('../order/order.model')).default;
+    const { ORDER_STATUS } = await import('../order/order.constant');
+
+    formattedData = await Promise.all(
+      data.map(async (item) => {
+        const couponObj = item.toObject();
+        const userUsageCount = await Order.countDocuments({
+          user: new Types.ObjectId(userId),
+          'coupon.code': item.code,
+          orderStatus: { $ne: ORDER_STATUS.CANCELLED },
+        });
+
+        const isUserLimitReached = userUsageCount >= (item.userUsageLimit || 1);
+        return {
+          ...couponObj,
+          userUsageCount,
+          isApplicableForUser: !isUserLimitReached,
+        };
+      }),
+    );
+  }
+
   return {
     meta: {
       page: meta.page,
@@ -43,7 +102,7 @@ const getAllCoupons = async (query: Record<string, unknown>, isAdmin = false) =>
       total: meta.total,
       totalPages: meta.totalPage,
     },
-    data,
+    data: formattedData,
   };
 };
 
@@ -108,6 +167,7 @@ const deleteCoupon = async (id: string): Promise<ICoupon> => {
 const validateAndCalculateDiscount = async (
   code: string,
   orderAmount: number,
+  userId?: string,
 ): Promise<IValidateCouponResult> => {
   const cleanCode = code.trim().toUpperCase();
 
@@ -134,7 +194,25 @@ const validateAndCalculateDiscount = async (
   }
 
   if (coupon.usedCount >= coupon.usageLimit) {
-    throw new BadRequestError(`Coupon '${cleanCode}' has reached its maximum usage limit.`);
+    throw new BadRequestError(`Coupon '${cleanCode}' has reached its maximum global usage limit.`);
+  }
+
+  // Personal user usage limit check
+  if (userId) {
+    const Order = (await import('../order/order.model')).default;
+    const { ORDER_STATUS } = await import('../order/order.constant');
+
+    const userUsageCount = await Order.countDocuments({
+      user: new Types.ObjectId(userId),
+      'coupon.code': cleanCode,
+      orderStatus: { $ne: ORDER_STATUS.CANCELLED },
+    });
+
+    if (userUsageCount >= (coupon.userUsageLimit || 1)) {
+      throw new BadRequestError(
+        `You have already reached your usage limit for coupon '${cleanCode}'.`,
+      );
+    }
   }
 
   if (orderAmount < coupon.minOrderAmount) {

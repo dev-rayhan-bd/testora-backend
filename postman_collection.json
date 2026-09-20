@@ -2874,23 +2874,75 @@
                   "query": [
                     {
                       "key": "page",
-                      "value": "1"
+                      "value": "1",
+                      "description": "Page number for pagination"
                     },
                     {
                       "key": "limit",
-                      "value": "20"
+                      "value": "20",
+                      "description": "Items per page"
                     },
                     {
                       "key": "status",
-                      "value": "active"
+                      "value": "active",
+                      "description": "Filter by workflow status (active, draft, hidden)"
                     },
                     {
                       "key": "isLowStock",
-                      "value": "false"
+                      "value": "false",
+                      "description": "Show products below lowStockAlert threshold (true/false)"
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Full-text search in title, description, category, SKU"
+                    },
+                    {
+                      "key": "category",
+                      "value": "Study Materials",
+                      "disabled": true,
+                      "description": "Filter by product category"
+                    },
+                    {
+                      "key": "minPrice",
+                      "value": "10",
+                      "disabled": true,
+                      "description": "Minimum price filter"
+                    },
+                    {
+                      "key": "maxPrice",
+                      "value": "100",
+                      "disabled": true,
+                      "description": "Maximum price filter"
+                    },
+                    {
+                      "key": "inStock",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter by stock availability (true/false)"
+                    },
+                    {
+                      "key": "hasDiscount",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Only show products currently on discount/sale"
+                    },
+                    {
+                      "key": "sku",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Exact SKU lookup (supports parent and variant SKUs)"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "-createdAt",
+                      "disabled": true,
+                      "description": "Sort by field (-createdAt, price, -price, stock)"
                     }
                   ]
                 },
-                "description": "Admin view listing all products including drafts, hidden products, and low stock warnings."
+                "description": "Comprehensive Admin products view with full enterprise filters: status (active/draft/hidden), low-stock alerts, search, price ranges, discount filter, and sorting."
               }
             },
             {
@@ -3374,7 +3426,7 @@
               "request": {
                 "method": "GET",
                 "url": {
-                  "raw": "{{baseUrl}}/products?page=1&limit=10&category=Study%20Materials&minPrice=10&maxPrice=100&inStock=true&searchTerm=",
+                  "raw": "{{baseUrl}}/products?page=1&limit=10",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -3384,35 +3436,59 @@
                   "query": [
                     {
                       "key": "page",
-                      "value": "1"
+                      "value": "1",
+                      "description": "Page number for pagination"
                     },
                     {
                       "key": "limit",
-                      "value": "10"
+                      "value": "10",
+                      "description": "Items per page"
                     },
                     {
                       "key": "category",
-                      "value": "Study Materials"
+                      "value": "Study Materials",
+                      "disabled": true,
+                      "description": "Filter by category"
                     },
                     {
                       "key": "minPrice",
-                      "value": "10"
+                      "value": "10",
+                      "disabled": true,
+                      "description": "Minimum price filter"
                     },
                     {
                       "key": "maxPrice",
-                      "value": "100"
+                      "value": "100",
+                      "disabled": true,
+                      "description": "Maximum price filter"
                     },
                     {
                       "key": "inStock",
-                      "value": "true"
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter in-stock products only"
+                    },
+                    {
+                      "key": "hasDiscount",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter products on sale"
                     },
                     {
                       "key": "searchTerm",
-                      "value": ""
+                      "value": "",
+                      "disabled": true,
+                      "description": "Search keywords in title, description, category, SKU"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "-createdAt",
+                      "disabled": true,
+                      "description": "Sort by -createdAt, price, -price"
                     }
                   ]
                 },
-                "description": "Browse active products with full-text search, category filter, dynamic min/max price range, and stock status."
+                "description": "Public storefront product discovery supporting full text search, category filtering, price range, stock availability, discount tags, and sorting."
               },
               "event": [
                 {
@@ -3479,6 +3555,25 @@
           "name": "Coupons & Vouchers",
           "description": "Validate voucher codes and calculate potential order savings.",
           "item": [
+            {
+              "name": "Get Active Promo Coupons (Storefront / Banners)",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/coupons",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "coupons"
+                  ]
+                },
+                "description": "Returns list of currently active, non-expired promotional voucher codes for students to browse on website banners and checkout."
+              }
+            },
             {
               "name": "Validate Coupon Code (Storefront)",
               "request": {

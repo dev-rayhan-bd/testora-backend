@@ -54,6 +54,11 @@ const couponSchema = new Schema<ICoupon, ICouponModel>(
       default: 100,
       min: [1, 'Usage limit must be at least 1'],
     },
+    userUsageLimit: {
+      type: Number,
+      default: 1,
+      min: [1, 'User usage limit must be at least 1'],
+    },
     usedCount: {
       type: Number,
       default: 0,
@@ -73,8 +78,16 @@ const couponSchema = new Schema<ICoupon, ICouponModel>(
   {
     timestamps: true,
     versionKey: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
 );
+
+couponSchema.virtual('status').get(function () {
+  if (!this.isActive) return 'inactive';
+  if (this.expiryDate && new Date(this.expiryDate) < new Date()) return 'expired';
+  return 'active';
+});
 
 couponSchema.index({ code: 1, isActive: 1, isDeleted: 1 });
 
