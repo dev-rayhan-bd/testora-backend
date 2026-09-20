@@ -1,6 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import QueryBuilder from '../../../builder/QueryBuilder';
 import { BadRequestError, NotFoundError } from '../../errors/request/apiError';
+import { storageService } from '../../services/storage.service';
 import {
   PRODUCT_BRAND,
   PRODUCT_SEARCHABLE_FIELDS,
@@ -17,13 +18,39 @@ import {
   TUpdateProductPayload,
 } from './product.zod';
 
+const extractFiles = (
+  files?: Record<string, Express.Multer.File[]> | Express.Multer.File[],
+): Express.Multer.File[] => {
+  if (!files) return [];
+  if (Array.isArray(files)) return files;
+  const list: Express.Multer.File[] = [];
+  for (const key of ['images', 'product_images', 'image', 'file', 'files']) {
+    if (files[key] && Array.isArray(files[key])) {
+      list.push(...files[key]);
+    }
+  }
+  return list;
+};
+
 // ── 1. Create Product ────────────────────────────────────────────────────────
 const createProduct = async (
   payload: TCreateProductPayload,
+  files?: Record<string, Express.Multer.File[]> | Express.Multer.File[],
 ): Promise<IProductDocument> => {
+  const uploadedFiles = extractFiles(files);
+  let finalImages = payload.images ? [...payload.images] : [];
+  if (uploadedFiles.length > 0) {
+    const uploadedUrls = await storageService.uploadMultipleFiles(
+      uploadedFiles,
+      'products',
+    );
+    finalImages = [...finalImages, ...uploadedUrls];
+  }
+
   // Enforce enterprise brand
   const productData = {
     ...payload,
+    images: finalImages,
     brand: PRODUCT_BRAND,
     isDeleted: false,
   };
@@ -159,6 +186,7 @@ const getProductByIdOrSlug = async (
 const updateProduct = async (
   id: string,
   payload: TUpdateProductPayload,
+  files?: Record<string, Express.Multer.File[]> | Express.Multer.File[],
 ): Promise<IProductDocument> => {
   const existingProduct = await Product.findOne({
     _id: new Types.ObjectId(id),
@@ -169,30 +197,48 @@ const updateProduct = async (
     throw new NotFoundError('Product not found or has been deleted.');
   }
 
+  const uploadedFiles = extractFiles(files);
+  let finalImages = payload.images ? [...payload.images] : [...existingProduct.images];
+  if (uploadedFiles.length > 0) {
+    const uploadedUrls = await storageService.uploadMultipleFiles(
+      uploadedFiles,
+      'products',
+    );
+    finalImages = [...finalImages, ...uploadedUrls];
+  }
+
   // Determine final status, title, and images after update
   const finalStatus = payload.status ?? existingProduct.status;
   const finalTitle = payload.title ?? existingProduct.title;
-  const finalImages = payload.images ?? existingProduct.images;
 
   // Enterprise Workflow: Cannot go live without title and at least one image
   if (finalStatus === PRODUCT_STATUS.ACTIVE) {
     if (!finalTitle || finalTitle.trim().length === 0) {
       throw new BadRequestError(
-        'Product title cannot be empty when publishing an active product.',
+        'Product must have a title before switching to active status.',
       );
     }
     if (!finalImages || finalImages.length === 0) {
       throw new BadRequestError(
-        'No product can go live without at least one image.',
+        'Product must have at least one image before going live.',
       );
     }
   }
 
-  // Apply updates
-  Object.assign(existingProduct, payload);
+  const updatedProduct = await Product.findByIdAndUpdate(
+    id,
+    {
+      ...payload,
+      images: finalImages,
+      brand: PRODUCT_BRAND,
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
 
-  const updated = await existingProduct.save();
-  return updated;
+  return updatedProduct!;
 };
 
 // ── 5. Soft-Delete Product ───────────────────────────────────────────────────

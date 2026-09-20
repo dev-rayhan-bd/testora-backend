@@ -47,18 +47,44 @@ userRouter.patch(
 // Form Data Request
 export const validateFormDataRequest = (schema: z.ZodType<any>) => {
   return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.body.data) {
-      sendResponse(res, {
-        statusCode: StatusCodes.BAD_REQUEST,
-        status: 'failed',
-        success: false,
-        message: 'Missing `data` field in form-data!',
-      });
+    let payload: any = req.body;
+
+    if (req.body?.data) {
+      try {
+        payload = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
+      } catch (err: any) {
+        sendResponse(res, {
+          statusCode: StatusCodes.BAD_REQUEST,
+          status: 'failed',
+          success: false,
+          message: 'Invalid JSON string provided in `data` field!',
+        });
+        return;
+      }
+    } else if (req.body && Object.keys(req.body).length > 0) {
+      // Auto-parse JSON strings, numbers, and booleans for direct multipart fields
+      payload = { ...req.body };
+      for (const key in payload) {
+        if (typeof payload[key] === 'string') {
+          const val = payload[key].trim();
+          if ((val.startsWith('{') && val.endsWith('}')) || (val.startsWith('[') && val.endsWith(']'))) {
+            try {
+              payload[key] = JSON.parse(val);
+            } catch {
+              // keep as string
+            }
+          } else if (!isNaN(Number(val)) && val !== '') {
+            payload[key] = Number(val);
+          } else if (val === 'true') {
+            payload[key] = true;
+          } else if (val === 'false') {
+            payload[key] = false;
+          }
+        }
+      }
     }
-    if (req?.body?.data) {
-      const jsonData = JSON.parse(req.body.data);
-      req.body = await schema.parseAsync(jsonData);
-      next();
-    }
+
+    req.body = await schema.parseAsync(payload);
+    next();
   });
 };

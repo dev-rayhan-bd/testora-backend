@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import { uploadFile } from '../../../helpers/fileuploader';
 import authMiddleware from '../../middlewares/auth.middleware';
-import { validateRequest } from '../../middlewares/request.validator';
+import { validateFormDataRequest, validateRequest } from '../../middlewares/request.validator';
+import { validateFileSizes } from '../../middlewares/validateFileSize';
 import { USER_ROLE } from '../user/user.constant';
 import { productController } from './product.controller';
 import productZodSchema from './product.zod';
@@ -51,15 +53,15 @@ productRouter.get(
 
 /**
  * @route   POST /api/v1/products
- * @desc    Create a new product
+ * @desc    Create a new product with multipart/form-data (uploads images to Cloudinary/S3)
  * @access  Admin & Super Admin
  */
 productRouter.post(
   '/',
   authMiddleware(USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
-  validateRequest({
-    body: productZodSchema.createProductSchema,
-  }),
+  uploadFile(),
+  validateFileSizes,
+  validateFormDataRequest(productZodSchema.createProductSchema),
   productController.createProduct,
 );
 
@@ -76,15 +78,15 @@ productRouter.patch(
 
 /**
  * @route   PATCH /api/v1/products/:id
- * @desc    Update an existing product
+ * @desc    Update an existing product with multipart/form-data
  * @access  Admin & Super Admin
  */
 productRouter.patch(
   '/:id',
   authMiddleware(USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
-  validateRequest({
-    body: productZodSchema.updateProductSchema,
-  }),
+  uploadFile(),
+  validateFileSizes,
+  validateFormDataRequest(productZodSchema.updateProductSchema),
   productController.updateProduct,
 );
 

@@ -35,6 +35,11 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().min(1, 'stripe secret key is required'),
   GMAIL_APP_USER: z.email('Invalid email format'),
   GMAIL_APP_PASSWORD: z.string().min(1, 'Gmail app password is required'),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_REGION: z.string().default('us-east-1'),
+  AWS_BUCKET_NAME: z.string().optional(),
+  STORAGE_DRIVER: z.enum(['auto', 'cloudinary', 's3']).default('auto'),
 });
 
 const envVars = envSchema.parse(process.env);
@@ -67,4 +72,9 @@ export default {
   app_id: envVars.APP_ID,
   server_secret: envVars.SERVER_SECRET,
   callback_secret: envVars.CALLBACK_SECRET,
+  aws_access_key_id: envVars.AWS_ACCESS_KEY_ID,
+  aws_secret_access_key: envVars.AWS_SECRET_ACCESS_KEY,
+  aws_region: envVars.AWS_REGION,
+  aws_bucket_name: envVars.AWS_BUCKET_NAME,
+  storage_driver: envVars.STORAGE_DRIVER,
 };

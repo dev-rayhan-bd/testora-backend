@@ -64,15 +64,6 @@ const createProductSchema = z
       .default(5),
   })
   .superRefine((data, ctx) => {
-    // Enterprise Workflow Validation: No product can go live without at least one image
-    if (data.status === 'active' && (!data.images || data.images.length === 0)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['images'],
-        message: 'No product can go live without at least one image.',
-      });
-    }
-
     // Compare at price should be higher than or equal to current price if set
     if (
       data.compareAtPrice !== null &&

@@ -6,7 +6,8 @@ import { productService } from './product.service';
 
 // ── 1. Create Product (Admin) ────────────────────────────────────────────────
 const createProduct = asyncHandler(async (req: Request, res: Response) => {
-  const result = await productService.createProduct(req.body);
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  const result = await productService.createProduct(req.body, files);
 
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,
@@ -63,7 +64,8 @@ const getProductDetails = asyncHandler(async (req: Request, res: Response) => {
 // ── 5. Update Product (Admin) ────────────────────────────────────────────────
 const updateProduct = asyncHandler(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const result = await productService.updateProduct(id, req.body);
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  const result = await productService.updateProduct(id, req.body, files);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,

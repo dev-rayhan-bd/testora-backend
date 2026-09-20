@@ -2810,15 +2810,22 @@
               "name": "Create Product (Admin) [Auto-Saves {{productId}}]",
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
+                "header": [],
                 "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"Study Materials\",\n  \"brand\": \"Testora\",\n  \"images\": [\n    \"https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800\",\n    \"https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800\"\n  ],\n  \"lowStockAlert\": 10\n}"
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"Study Materials\",\n  \"lowStockAlert\": 10,\n  \"variants\": [\n    {\n      \"color\": \"Navy Blue\",\n      \"size\": \"Standard\",\n      \"price\": 39.99,\n      \"stock\": 100\n    }\n  ]\n}",
+                      "type": "text",
+                      "description": "Product JSON metadata (supports variants, status, price, etc.)"
+                    },
+                    {
+                      "key": "images",
+                      "type": "file",
+                      "description": "Select product image file(s) to upload (auto uploads to Cloudinary or AWS S3)"
+                    }
+                  ]
                 },
                 "url": {
                   "raw": "{{baseUrl}}/products",
@@ -2829,7 +2836,7 @@
                     "products"
                   ]
                 },
-                "description": "Create a new branded product. Active status requires at least one image."
+                "description": "Create a new branded product using multipart/form-data. Upload image files directly; the storage engine automatically routes to Cloudinary or AWS S3."
               },
               "event": [
                 {
@@ -2890,15 +2897,22 @@
               "name": "Update Product Details",
               "request": {
                 "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
+                "header": [],
                 "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024 - Updated Edition\",\n  \"price\": 44.99,\n  \"stock\": 200,\n  \"status\": \"active\"\n}"
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024 - Updated Edition\",\n  \"price\": 44.99,\n  \"stock\": 200,\n  \"status\": \"active\"\n}",
+                      "type": "text",
+                      "description": "Updated product fields in JSON string format"
+                    },
+                    {
+                      "key": "images",
+                      "type": "file",
+                      "description": "Optional additional image files to upload and append"
+                    }
+                  ]
                 },
                 "url": {
                   "raw": "{{baseUrl}}/products/{{productId}}",
@@ -2910,7 +2924,7 @@
                     "{{productId}}"
                   ]
                 },
-                "description": "Update product title, pricing, inventory, or workflow status."
+                "description": "Update product details using multipart/form-data. Optional images will be uploaded to Cloudinary/S3 and appended to existing photos."
               }
             },
             {
