@@ -12,6 +12,9 @@ import subjectRouter from '../modules/subject/subject.route';
 import testRouter from '../modules/test/test.route';
 import userRouter from '../modules/user/user.route';
 import blogRouter from '../modules/blog/blog.route';
+import productRouter from '../modules/product/product.route';
+import orderRouter from '../modules/order/order.route';
+import couponRouter from '../modules/coupon/coupon.route';
 
 
 const routersVersionOne = express.Router();
@@ -33,6 +36,36 @@ const appRouters = [
   {
     path: '/blog',
     router: blogRouter,
+  },
+
+  {
+    path: '/product',
+    router: productRouter,
+  },
+
+  {
+    path: '/products',
+    router: productRouter,
+  },
+
+  {
+    path: '/orders',
+    router: orderRouter,
+  },
+
+  {
+    path: '/order',
+    router: orderRouter,
+  },
+
+  {
+    path: '/coupons',
+    router: couponRouter,
+  },
+
+  {
+    path: '/coupon',
+    router: couponRouter,
   },
 
   {

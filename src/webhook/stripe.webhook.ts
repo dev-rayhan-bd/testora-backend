@@ -1,203 +1,137 @@
-// import { Request, Response } from 'express';
-// import { Types } from 'mongoose';
-// import Stripe from 'stripe';
-// import CustomError from '../app/errors';
-// import { SubscriptionPurchase } from '../app/modules/subscriptionPurchaseModule/subscriptionPurchase.model';
-// import subscriptionPurchaseServices from '../app/modules/subscriptionPurchaseModule/subscriptionPurchase.services';
+import { Request, Response } from 'express';
+import Stripe from 'stripe';
+import { BadRequestError } from '../app/errors/request/apiError';
+import { ORDER_STATUS, PAYMENT_STATUS } from '../app/modules/order/order.constant';
+import Order from '../app/modules/order/order.model';
+import { productService } from '../app/modules/product/product.service';
+import config from '../config';
 
-// import config from '../config';
+const stripe = new Stripe(config.stripe_secret_key as string);
 
-// import Subscription from '../app/modules/subscriptionModule/subscription.model';
-// import { PaymentSourceType, PaymentStatus } from '../app/modules/subscriptionPurchaseModule/subscriptionPurchase.interface';
-// import User from '../app/modules/user/user.model';
-// import handleAsync from '../shared/asynchandler';
-// import sendMail from '../utilities/sendEmail';
+export const stripeWebhookHandler = async (req: Request, res: Response): Promise<void> => {
+  const sig = req.headers['stripe-signature'] as string;
+  const webhookSecret = config.stripe_webhook_secret as string;
 
-// const stripe = new Stripe(config.stripe_secret_key as string);
+  if (!sig || !webhookSecret) {
+    res.status(400).json({ error: 'Missing stripe signature or webhook secret' });
+    return;
+  }
 
-// export const stripeWebhookHandler = handleAsync(async (req: Request, res: Response) => {
-//   const sig = req.headers['stripe-signature'] as string;
-//   const webhookSecret = config.stripe_webhook_secret as string;
+  let event: any;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err: any) {
+    console.error('⚠️ Webhook signature verification failed:', err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
 
-//   let event: Stripe.Event;
-//   try {
-//     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-//     console.log('Stripe webhook event type:', event.type);
-//   } catch (err: any) {
-//     console.error('Webhook signature verification failed:', err.message);
-//     throw new CustomError.BadRequestError(err.message);
-//   }
+  console.log(`🔔 Received Stripe Webhook Event: ${event.type}`);
 
-//   const session = event.data.object as Stripe.Checkout.Session;
+  try {
+    switch (event.type) {
+      // ── 1. Checkout Session Completed (Order Paid) ──────────────────────────
+      case 'checkout.session.completed': {
+        const session = event.data.object as any;
+        const orderId = session.metadata?.orderId;
 
-//   // console.log('subcription object', session);
-//   const customerId = session.customer as string;
+        if (orderId) {
+          const order = await Order.findById(orderId);
+          if (order) {
+            order.payment.status = PAYMENT_STATUS.PAID;
+            order.payment.paidAt = new Date();
+            order.payment.stripeSessionId = session.id;
+            if (session.payment_intent) {
+              order.payment.stripePaymentIntentId = session.payment_intent as string;
+            }
+            if (order.orderStatus === ORDER_STATUS.PENDING) {
+              order.orderStatus = ORDER_STATUS.CONFIRMED;
+            }
+            await order.save();
+            console.log(`✅ Order '${order.orderNumber}' marked as PAID via Stripe Checkout.`);
+          }
+        }
+        break;
+      }
 
-//   const user = await User.findOne({ stripeCustomerId: customerId });
-//   if (!user) throw new CustomError.NotFoundError('Customer not found');
+      // ── 2. Payment Intent Succeeded ─────────────────────────────────────────
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as any;
+        const orderId = paymentIntent.metadata?.orderId;
 
-//   switch (event.type) {
-//     case 'checkout.session.completed': {
-//       try {
-//         console.log('Checkout session completed access');
-//         const session = event.data.object as Stripe.Checkout.Session;
-//         // console.log('session', session);
-//         const subscriptionId = session.subscription as string;
-//         // Retrieve full subscription to get the priceId
-//         const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
-//         const priceId = stripeSubscription.items.data[0]?.price?.id;
+        const order = orderId
+          ? await Order.findById(orderId)
+          : await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntent.id });
 
-//         const subscriptionPlan: any = await Subscription.findOne({ priceId });
+        if (order && order.payment.status !== PAYMENT_STATUS.PAID) {
+          order.payment.status = PAYMENT_STATUS.PAID;
+          order.payment.paidAt = new Date();
+          order.payment.stripePaymentIntentId = paymentIntent.id;
+          if (order.orderStatus === ORDER_STATUS.PENDING) {
+            order.orderStatus = ORDER_STATUS.CONFIRMED;
+          }
+          await order.save();
+          console.log(`✅ Order '${order.orderNumber}' payment succeeded.`);
+        }
+        break;
+      }
 
-//         //create subscription
-//         const subscriptionPurchase = await subscriptionPurchaseServices.createSubscriptionPurchase({
-//           user: user._id as Types.ObjectId,
-//           subscriptionPlan: subscriptionPlan._id,
-//           subscription: {
-//             subscriptionId: subscriptionId,
-//             priceId: priceId,
-//           },
-//           paymentStatus: PaymentStatus.Success,
-//           paymentSource: {
-//             source: 'Stripe',
-//             type: PaymentSourceType.Visa,
-//             isSaved: false,
-//           },
-//           isActive: true,
-//         });
+      // ── 3. Payment Intent Failed ────────────────────────────────────────────
+      case 'payment_intent.payment_failed': {
+        const paymentIntent = event.data.object as any;
+        const orderId = paymentIntent.metadata?.orderId;
 
-//         console.log('subscriptionPurchase', subscriptionPurchase);
+        const order = orderId
+          ? await Order.findById(orderId)
+          : await Order.findOne({ 'payment.stripePaymentIntentId': paymentIntent.id });
 
-//         user.activeSubscription = {
-//           id: subscriptionPurchase._id as Types.ObjectId,
-//           title: subscriptionPlan.title || '',
-//         };
-//         await user.save();
+        if (order && order.payment.status !== PAYMENT_STATUS.PAID) {
+          order.payment.status = PAYMENT_STATUS.FAILED;
+          await order.save();
+          console.log(`❌ Order '${order.orderNumber}' payment failed.`);
+        }
+        break;
+      }
 
-//         const content = `Congratulations! Your subscription purchase is successful!`;
-//         await sendMail({
-//           from: config.gmail_app_user as string,
-//           to: user.email,
-//           subject: 'car-verify - Subscription Purchase',
-//           text: content,
-//         });
-//         break;
-//       } catch (error) {
-//         console.error("Error handling 'customer.subscription.updated':", error);
-//       }
-//     }
+      // ── 4. Charge Refunded ──────────────────────────────────────────────────
+      case 'charge.refunded': {
+        const charge = event.data.object as any;
+        const paymentIntentId = charge.payment_intent as string;
 
-//     case 'invoice.payment_failed': {
-//       console.warn('Payment failed for invoice', session.id);
+        if (paymentIntentId) {
+          const order = await Order.findOne({
+            'payment.stripePaymentIntentId': paymentIntentId,
+          });
 
-//       const content = `Your subscription purchase has failed!`;
-//       await sendMail({
-//         from: config.gmail_app_user as string,
-//         to: user.email,
-//         subject: 'car-verify - Subscription Payment Failed',
-//         text: content,
-//       });
-//       break;
-//     }
+          if (order && order.orderStatus !== ORDER_STATUS.REFUNDED) {
+            order.orderStatus = ORDER_STATUS.REFUNDED;
+            order.payment.status = PAYMENT_STATUS.REFUNDED;
+            order.payment.refundedAt = new Date();
+            order.cancellationReason = 'Refund processed via Stripe dashboard';
 
-//     case 'customer.subscription.deleted': {
-//       const existingPurchase = await SubscriptionPurchase.findOne({ userId: user._id });
-//       if (existingPurchase) {
-//         await SubscriptionPurchase.findByIdAndUpdate(existingPurchase._id, {
-//           isActive: false,
-//         });
-//       }
+            // Restore inventory for refunded items
+            for (const item of order.items) {
+              await productService.restoreStock(
+                item.product.toString(),
+                item.quantity,
+                item.variantId?.toString(),
+              );
+            }
 
-//       user.activeSubscription = {
-//         id: null,
-//         title: '',
-//       };
-//       await user.save();
+            await order.save();
+            console.log(`↩️ Order '${order.orderNumber}' marked as REFUNDED and stock restored.`);
+          }
+        }
+        break;
+      }
 
-//       const content = `Your subscription has been deleted.`;
-//       await sendMail({
-//         from: config.gmail_app_user as string,
-//         to: user.email,
-//         subject: 'car-verify - Subscription deleted',
-//         text: content,
-//       });
-//       break;
-//     }
+      default:
+        console.log(`ℹ️ Unhandled Stripe event type: ${event.type}`);
+    }
 
-//     //updated
-
-//     case 'customer.subscription.updated': {
-//       console.log('subcription updated access');
-//       try {
-//         const subscription = event.data.object as Stripe.Subscription;
-//         const newPriceId = subscription.items.data[0]?.price?.id;
-//         const cancelAtPeriodEnd = subscription.cancel_at_period_end;
-
-//         const existingPurchase: any = await subscriptionPurchaseServices.getSubscriptionPurchaseByUserId(user._id as unknown as string);
-
-//         // Do nothing if cancel_at_period_end is set — wait for the deletion event
-//         if (cancelAtPeriodEnd) {
-//           console.log('Subscription is set to cancel at period end');
-//           // Optionally send email to inform the user
-//           await sendMail({
-//             from: config.gmail_app_user as string,
-//             to: user.email,
-//             subject: 'Subscription Will End Soon',
-//             text: `Your subscription is scheduled to end after the current billing period.`,
-//           });
-//           break;
-//         }
-
-//         // Plan changed
-//         console.log('existingPurchase', existingPurchase);
-//         if (existingPurchase?.subscriptionId?.priceId !== newPriceId) {
-//           if (existingPurchase) {
-//             await subscriptionPurchaseServices.UpdatedSubscriptionPurchase(existingPurchase._id as string, {
-//               isActive: false,
-//             });
-//           }
-//           const subscriptionPlan: any = await Subscription.findOne({ priceId: newPriceId });
-//           const newPurchase = await subscriptionPurchaseServices.createSubscriptionPurchase({
-//             user: user._id as Types.ObjectId,
-//             subscriptionPlan: subscriptionPlan._id,
-//             subscription: {
-//               subscriptionId: subscription.id,
-//               priceId: newPriceId,
-//             },
-//             paymentStatus: PaymentStatus.Success,
-//             paymentSource: {
-//               source: 'Stripe',
-//               type: PaymentSourceType.Visa,
-//               isSaved: false,
-//             },
-//             isActive: true,
-//           });
-
-//           user.activeSubscription = {
-//             id: newPurchase._id as Types.ObjectId,
-//             title: subscriptionPlan.title,
-//           };
-//           await user.save();
-
-//           await sendMail({
-//             from: config.gmail_app_user as string,
-//             to: user.email,
-//             subject: 'Plan Switched',
-//             text: `Your subscription plan has been updated successfully.`,
-//           });
-//         }
-//       } catch (error) {
-//         console.error("Error handling 'customer.subscription.updated':", error);
-//       }
-
-//       break;
-//     }
-
-//     // Handle other events like 'customer.subscription.updated', 'customer.subscription.paused', etc.
-
-//     default:
-//       console.log(`Unhandled event type ${event.type}`);
-//   }
-
-//   res.status(200).json({ received: true });
-// });
+    res.status(200).json({ received: true });
+  } catch (err: any) {
+    console.error('Error processing Stripe webhook event:', err);
+    res.status(500).json({ error: 'Internal server error processing webhook' });
+  }
+};

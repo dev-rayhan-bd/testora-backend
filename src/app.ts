@@ -14,11 +14,11 @@ import { applyRateLimit } from './app/middlewares/rateLimit.config';
 import routers from './app/routers';
 import { compressionOptions } from './config/compression.config';
 import { helmetConfig } from './config/helmet.config';
-import rootDesign from './helpers/rootDesign';
+import { stripeWebhookHandler } from './webhook/stripe.webhook';
 
 const app: Application = express();
 
-// app.post('/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
+app.post('/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 // global middlewares
 
 app.use(express.static(path.resolve('./src/public')));
@@ -60,9 +60,6 @@ app.use(applyRateLimit());
 
 // application middleware
 app.use('/api', routers);
-
-// send html design with a button 'click to see server health' and integrate an api to check server health
-app.get('/', rootDesign);
 
 app.get('/health_check', (_req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({

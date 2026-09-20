@@ -110,6 +110,36 @@
       "key": "blogId",
       "value": "64f1a2b3c4d5e6f7a8b9c0d8",
       "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "couponId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "couponCode",
+      "value": "SAVE10",
+      "type": "string"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "checkout_key_demo_001",
+      "type": "string"
     }
   ],
   "item": [
@@ -147,6 +177,39 @@
               "path": []
             },
             "description": "Get root welcome page."
+          }
+        },
+        {
+          "name": "Stripe Webhook Listener",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "stripe-signature",
+                "value": "t=123456,v1=test_signature"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test_12345\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"cs_test_123\",\n      \"metadata\": {\n        \"orderId\": \"{{orderId}}\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl_root}}/webhook",
+              "host": [
+                "{{baseUrl_root}}"
+              ],
+              "path": [
+                "webhook"
+              ]
+            },
+            "description": "Simulates inbound Stripe Webhook events. Requires valid stripe-signature when called against live Stripe secret."
           }
         }
       ]
@@ -2736,6 +2799,935 @@
                   ]
                 },
                 "description": "Permanently remove a blog post."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Product Management (E-Commerce)",
+          "item": [
+            {
+              "name": "Create Product (Admin) [Auto-Saves {{productId}}]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"Study Materials\",\n  \"brand\": \"Testora\",\n  \"images\": [\n    \"https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800\",\n    \"https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800\"\n  ],\n  \"lowStockAlert\": 10\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products"
+                  ]
+                },
+                "description": "Create a new branded product. Active status requires at least one image."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 201\", function () {",
+                      "    pm.response.to.have.status(201);",
+                      "});",
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data._id) {",
+                      "    pm.collectionVariables.set(\"productId\", res.data._id);",
+                      "    console.log(\"Saved productId:\", res.data._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get All Products (Admin - All Statuses & Low Stock)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products/admin/all?page=1&limit=20&status=active&isLowStock=false",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "admin",
+                    "all"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "status",
+                      "value": "active"
+                    },
+                    {
+                      "key": "isLowStock",
+                      "value": "false"
+                    }
+                  ]
+                },
+                "description": "Admin view listing all products including drafts, hidden products, and low stock warnings."
+              }
+            },
+            {
+              "name": "Update Product Details",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024 - Updated Edition\",\n  \"price\": 44.99,\n  \"stock\": 200,\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{productId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "{{productId}}"
+                  ]
+                },
+                "description": "Update product title, pricing, inventory, or workflow status."
+              }
+            },
+            {
+              "name": "Soft-Delete Product",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{productId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "{{productId}}"
+                  ]
+                },
+                "description": "Soft-delete a product (marks isDeleted: true and status: hidden)."
+              }
+            },
+            {
+              "name": "Restore Soft-Deleted Product",
+              "request": {
+                "method": "PATCH",
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{productId}}/restore",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "{{productId}}",
+                    "restore"
+                  ]
+                },
+                "description": "Restore a deleted product back to draft status."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order Management (Marketplace)",
+          "description": "Manage customer orders, track courier logistics, change statuses, and process refunds.",
+          "item": [
+            {
+              "name": "Get All Orders (Advanced Filters)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/orders/admin/all?page=1&limit=10&orderStatus=pending",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "orders",
+                    "admin",
+                    "all"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "orderStatus",
+                      "value": "pending"
+                    },
+                    {
+                      "key": "paymentStatus",
+                      "value": "paid",
+                      "disabled": true
+                    },
+                    {
+                      "key": "paymentMethod",
+                      "value": "cash_on_delivery",
+                      "disabled": true
+                    },
+                    {
+                      "key": "courierName",
+                      "value": "DHL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "startDate",
+                      "value": "2026-01-01",
+                      "disabled": true
+                    },
+                    {
+                      "key": "endDate",
+                      "value": "2026-12-31",
+                      "disabled": true
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": "Jane",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Comprehensive query builder for Admin order management with filters for date range, courier, payment, and status."
+              }
+            },
+            {
+              "name": "Update Order Status (Workflow)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"shipped\",\n  \"note\": \"Package handed over to DHL courier facility\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/orders/admin/{{orderId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "orders",
+                    "admin",
+                    "{{orderId}}",
+                    "status"
+                  ]
+                },
+                "description": "Move order through lifecycle: pending -> confirmed -> processing -> shipped -> delivered -> cancelled."
+              }
+            },
+            {
+              "name": "Add / Update Courier Tracking Info",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"courierName\": \"DHL Express\",\n  \"trackingNumber\": \"DHL-9876543210\",\n  \"trackingUrl\": \"https://www.dhl.com/en/express/tracking.html?AWB=9876543210\",\n  \"estimatedDelivery\": \"2026-09-25T18:00:00.000Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/orders/admin/{{orderId}}/tracking",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "orders",
+                    "admin",
+                    "{{orderId}}",
+                    "tracking"
+                  ]
+                },
+                "description": "Attach tracking information that is instantly visible to the customer on their order details."
+              }
+            },
+            {
+              "name": "Refund Order (Stripe & Inventory Restock)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Defective item returned by customer\",\n  \"amount\": 50\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/orders/admin/{{orderId}}/refund",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "orders",
+                    "admin",
+                    "{{orderId}}",
+                    "refund"
+                  ]
+                },
+                "description": "Processes refund directly via Stripe API and restores stock in an ACID database transaction."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Coupon & Voucher Management",
+          "description": "Create, update, and manage discount campaigns for the marketplace.",
+          "item": [
+            {
+              "name": "Create Coupon Code",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 201\", function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data._id) {",
+                      "        pm.environment.set(\"couponId\", jsonData.data._id);",
+                      "        pm.environment.set(\"couponCode\", jsonData.data.code);",
+                      "    }",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"TESTORA20\",\n  \"description\": \"Special 20% Discount for Testora Storefront\",\n  \"discountType\": \"percentage\",\n  \"discountAmount\": 20,\n  \"minimumOrderAmount\": 50,\n  \"maxDiscountAmount\": 30,\n  \"usageLimit\": 100,\n  \"userUsageLimit\": 1,\n  \"startDate\": \"2026-09-01T00:00:00.000Z\",\n  \"expiryDate\": \"2026-12-31T23:59:59.000Z\",\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/coupons",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "coupons"
+                  ]
+                },
+                "description": "Create a new voucher code with usage limits, date bounds, and maximum discounts."
+              }
+            },
+            {
+              "name": "Get All Coupons (Admin)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/coupons?status=active",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "coupons"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "List all discount vouchers with usage counters and status."
+              }
+            },
+            {
+              "name": "Get Coupon By ID (Admin)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "coupons",
+                    "{{couponId}}"
+                  ]
+                },
+                "description": "Get single coupon details."
+              }
+            },
+            {
+              "name": "Update Coupon (Admin)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"discountAmount\": 25,\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "coupons",
+                    "{{couponId}}"
+                  ]
+                },
+                "description": "Update discount or modify coupon constraints."
+              }
+            },
+            {
+              "name": "Delete Coupon (Admin)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "coupons",
+                    "{{couponId}}"
+                  ]
+                },
+                "description": "Soft delete coupon."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Storefront & E-Commerce (Testora Marketplace)",
+      "description": "Public e-commerce storefront endpoints for product discovery, price filtering, details, and inventory checks.",
+      "item": [
+        {
+          "name": "Products & Inventory",
+          "description": "Browse marketplace products, view variants (color/size), and check live stock availability.",
+          "item": [
+            {
+              "name": "Get Products (Public Storefront Filtered)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products?page=1&limit=10&category=Study%20Materials&minPrice=10&maxPrice=100&inStock=true&searchTerm=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "category",
+                      "value": "Study Materials"
+                    },
+                    {
+                      "key": "minPrice",
+                      "value": "10"
+                    },
+                    {
+                      "key": "maxPrice",
+                      "value": "100"
+                    },
+                    {
+                      "key": "inStock",
+                      "value": "true"
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": ""
+                    }
+                  ]
+                },
+                "description": "Browse active products with full-text search, category filter, dynamic min/max price range, and stock status."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var res = pm.response.json();",
+                      "if (res.data && res.data.length > 0 && res.data[0]._id) {",
+                      "    pm.collectionVariables.set(\"productId\", res.data[0]._id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Single Product (by ID or Slug)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{productId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "{{productId}}"
+                  ]
+                },
+                "description": "Fetch detailed product information using MongoDB ObjectId or friendly slug URL."
+              }
+            },
+            {
+              "name": "Check Stock Availability (Checkout Helper)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/check-stock",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "check-stock"
+                  ]
+                },
+                "description": "Verify if requested item quantity is available in stock prior to order placement."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Coupons & Vouchers",
+          "description": "Validate voucher codes and calculate potential order savings.",
+          "item": [
+            {
+              "name": "Validate Coupon Code (Storefront)",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"{{couponCode}}\",\n  \"orderAmount\": 120\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/coupons/validate",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "coupons",
+                    "validate"
+                  ]
+                },
+                "description": "Validate voucher code and calculate potential discount before completing checkout."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checkout & Orders",
+          "description": "Customer checkout with COD or Stripe, order tracking, and history.",
+          "item": [
+            {
+              "name": "Place Order - Cash on Delivery (COD)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 201\", function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data._id) {",
+                      "        pm.environment.set(\"orderId\", jsonData.data._id);",
+                      "        pm.environment.set(\"orderNumber\", jsonData.data.orderNumber);",
+                      "        console.log(\"Saved orderId:\", jsonData.data._id);",
+                      "    }",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-idempotency-key",
+                    "value": "{{idempotencyKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue, Suite 400\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"cash_on_delivery\",\n  \"couponCode\": \"{{couponCode}}\",\n  \"customerNotes\": \"Please call before delivery\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/orders/checkout",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "checkout"
+                  ]
+                },
+                "description": "Place an order using Cash on Delivery. Decreases stock atomically via MongoDB ACID transactions and reserves order."
+              }
+            },
+            {
+              "name": "Place Order - Stripe Checkout Session (Online Card)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 201\", function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data._id) {",
+                      "        pm.environment.set(\"orderId\", jsonData.data._id);",
+                      "        pm.environment.set(\"orderNumber\", jsonData.data.orderNumber);",
+                      "    }",
+                      "    if (jsonData.data && jsonData.data.payment && jsonData.data.payment.stripeCheckoutUrl) {",
+                      "        console.log(\"Stripe Checkout URL:\", jsonData.data.payment.stripeCheckoutUrl);",
+                      "    }",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-idempotency-key",
+                    "value": "stripe_order_{{$timestamp}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"stripe\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/orders/checkout",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "checkout"
+                  ]
+                },
+                "description": "Places order and returns a Stripe Hosted Checkout URL. Customer completes payment on Stripe and webhook confirms order."
+              }
+            },
+            {
+              "name": "Get My Order History (Student)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/orders/my-orders?page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "my-orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "orderStatus",
+                      "value": "pending",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Fetch student order history with pagination, statuses, and live courier tracking."
+              }
+            },
+            {
+              "name": "Get Order Details (Customer / Admin)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/orders/{{orderId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                },
+                "description": "Retrieve detailed information for a single order, including tracking and breakdown."
+              }
+            },
+            {
+              "name": "Cancel Order (Customer)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Changed my mind before dispatch\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/orders/{{orderId}}/cancel",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "{{orderId}}",
+                    "cancel"
+                  ]
+                },
+                "description": "Allows customer to cancel an unfulfilled (pending/confirmed) order. Restores inventory automatically."
               }
             }
           ]
