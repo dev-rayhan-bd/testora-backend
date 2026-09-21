@@ -15,6 +15,7 @@ import blogRouter from '../modules/blog/blog.route';
 import productRouter from '../modules/product/product.route';
 import orderRouter from '../modules/order/order.route';
 import couponRouter from '../modules/coupon/coupon.route';
+import shippingRouter from '../modules/shipping/shipping.route';
 
 
 const routersVersionOne = express.Router();
@@ -66,6 +67,14 @@ const appRouters = [
   {
     path: '/coupon',
     router: couponRouter,
+  },
+  {
+    path: '/shipping',
+    router: shippingRouter,
+  },
+  {
+    path: '/shipping-settings',
+    router: shippingRouter,
   },
 
   {

@@ -4,6 +4,7 @@ import QueryBuilder from '../../../builder/QueryBuilder';
 import config from '../../../config';
 import { BadRequestError, NotFoundError } from '../../errors/request/apiError';
 import { couponService } from '../coupon/coupon.service';
+import { shippingService } from '../shipping/shipping.service';
 import { productService } from '../product/product.service';
 import Product from '../product/product.model';
 import {
@@ -127,8 +128,9 @@ const createCheckoutOrder = async (
 
     subtotal = Number(subtotal.toFixed(2));
 
-    // 2. Shipping Calculation (Free shipping over $50, else $5.00 flat fee)
-    const shippingFee = subtotal >= 50 ? 0 : 5.0;
+    // 2. Dynamic Shipping Calculation (Configured dynamically by Admin)
+    const shippingCalc = await shippingService.calculateShippingFee(subtotal);
+    const shippingFee = shippingCalc.shippingFee;
 
     // 3. Coupon Voucher Verification & Calculation
     let discountAmount = 0;

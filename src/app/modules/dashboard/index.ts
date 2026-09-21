@@ -9,6 +9,7 @@ import blogRouter from "../blog/blog.route";
 import productRouter from "../product/product.route";
 import orderRouter from "../order/order.route";
 import couponRouter from "../coupon/coupon.route";
+import shippingRouter from "../shipping/shipping.route";
 
 
 const adminRouter = Router();
@@ -21,6 +22,8 @@ adminRouter.use('/blog', blogRouter);
 adminRouter.use('/products', productRouter);
 adminRouter.use('/orders', orderRouter);
 adminRouter.use('/coupons', couponRouter);
+adminRouter.use('/shipping', shippingRouter);
+adminRouter.use('/shipping-settings', shippingRouter);
 adminRouter.use('/get-me', authMiddleware(USER_ROLE.SUPER_ADMIN), adminController.getMeIntoDb);
 
 
