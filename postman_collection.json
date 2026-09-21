@@ -2804,6 +2804,178 @@
           ]
         },
         {
+          "name": "Category Management (Admin CRUD)",
+          "description": "Manage product categories, upload thumbnails to Cloudinary/S3, and set active/inactive status.",
+          "item": [
+            {
+              "name": "Create Category (Admin) [Auto-Saves {{categoryId}}]",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const res = pm.response.json();",
+                      "if (res.success && res.data && res.data._id) {",
+                      "    pm.environment.set(\"categoryId\", res.data._id);",
+                      "    pm.environment.set(\"categorySlug\", res.data.slug);",
+                      "    console.log(\"Saved categoryId:\", res.data._id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "{\n  \"name\": \"Books & Study Materials\",\n  \"description\": \"Official prep books, formula sheets, mock test sets, and previous year solutions.\",\n  \"isActive\": true\n}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "image",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/categories",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories"
+                  ]
+                },
+                "description": "Creates a new product category with multipart/form-data. Supports optional icon/thumbnail upload."
+              }
+            },
+            {
+              "name": "Get All Categories (Admin View)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/categories/admin/all?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories",
+                    "admin",
+                    "all"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": "Page number"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": "Items per page"
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Search by category name, slug, description"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter by active status (true/false)"
+                    }
+                  ]
+                },
+                "description": "Admin view listing all categories including inactive ones with live assigned product count."
+              }
+            },
+            {
+              "name": "Update Category (Admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "{\n  \"name\": \"Books & Study Materials\",\n  \"description\": \"Updated comprehensive formula sheets and exam prep books.\"\n}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "image",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/categories/{{categoryId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories",
+                    "{{categoryId}}"
+                  ]
+                },
+                "description": "Updates category information, status, or thumbnail image."
+              }
+            },
+            {
+              "name": "Delete Category (Admin - Guard Protected)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/categories/{{categoryId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories",
+                    "{{categoryId}}"
+                  ]
+                },
+                "description": "Safely soft-deletes a category. Prevents deletion if products are currently assigned to this category."
+              }
+            }
+          ]
+        },
+        {
           "name": "Product Management (E-Commerce)",
           "item": [
             {
@@ -3476,6 +3648,47 @@
       "name": "10. Storefront & E-Commerce (Testora Marketplace)",
       "description": "Public e-commerce storefront endpoints for product discovery, price filtering, details, and inventory checks.",
       "item": [
+        {
+          "name": "Categories (Storefront Browse)",
+          "description": "Public categories discovery for homepage navigation menus, carousels, and storefront category filters.",
+          "item": [
+            {
+              "name": "Get Categories (Storefront with Product Count)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/categories",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories"
+                  ]
+                },
+                "description": "Returns active categories list with real-time active product count for storefront menus."
+              }
+            },
+            {
+              "name": "Get Single Category (by ID or Slug)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/categories/{{categoryId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "categories",
+                    "{{categoryId}}"
+                  ]
+                },
+                "description": "Returns single category metadata and product count by Mongo ID or URL slug."
+              }
+            }
+          ]
+        },
         {
           "name": "Products & Inventory",
           "description": "Browse marketplace products, view variants (color/size), and check live stock availability.",

@@ -40,7 +40,8 @@ app.use(
       'http://10.10.28.81:3002',
       'https://testora-dashboard.vercel.app',
       'https://testora-dashboards.vercel.app',
-      'https://testora-frontend.vercel.app'
+      'https://testora-frontend.vercel.app',
+      'http://10.10.28.99:3000'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],

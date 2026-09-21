@@ -122,9 +122,9 @@ const productSchema = new Schema<IProductDocument, IProductModel>(
       index: true,
     },
     category: {
-      type: String,
+      type: Schema.Types.Mixed,
+      ref: 'Category',
       required: [true, 'Product category is required'],
-      trim: true,
       index: true,
     },
     brand: {

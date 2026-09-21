@@ -27,7 +27,7 @@ export interface IProduct extends Document {
   savingsAmount: number;
   stock: number;
   status: TProductStatus;
-  category: string;
+  category: Types.ObjectId | string | any;
   brand: string;
   images: string[];
   variants: IProductVariant[];

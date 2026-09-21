@@ -49,9 +49,28 @@ const createProduct = async (
     finalImages = [...finalImages, ...uploadedUrls];
   }
 
+  // Resolve category if matching Category document exists
+  let categoryVal: any = payload.category;
+  if (Types.ObjectId.isValid(payload.category)) {
+    categoryVal = new Types.ObjectId(payload.category);
+  } else if (payload.category) {
+    const Category = (await import('../category/category.model')).default;
+    const cat = await Category.findOne({
+      $or: [
+        { name: { $regex: new RegExp(`^${payload.category.trim()}$`, 'i') } },
+        { slug: payload.category.trim().toLowerCase() },
+      ],
+      isDeleted: false,
+    });
+    if (cat) {
+      categoryVal = cat._id;
+    }
+  }
+
   // Enforce enterprise brand
   const productData = {
     ...payload,
+    category: categoryVal,
     images: finalImages,
     brand: PRODUCT_BRAND,
     isDeleted: false,
@@ -89,13 +108,36 @@ const getAllProducts = async (
     filterConditions.status = query.status as string;
   }
 
-  // Category filter (supports both category ID and category name case-insensitively)
+  // Category filter (supports Category ObjectId, Category Slug, and Category Name)
   if (query.category) {
     const catVal = String(query.category).trim();
     if (Types.ObjectId.isValid(catVal)) {
-      filterConditions.category = catVal;
+      if (!filterConditions.$and) filterConditions.$and = [];
+      filterConditions.$and.push({
+        $or: [
+          { category: new Types.ObjectId(catVal) },
+          { category: catVal },
+        ],
+      });
     } else {
-      filterConditions.category = { $regex: new RegExp(catVal, 'i') };
+      const Category = (await import('../category/category.model')).default;
+      const matchedCategories = await Category.find({
+        $or: [
+          { slug: catVal.toLowerCase() },
+          { name: { $regex: new RegExp(catVal, 'i') } },
+        ],
+        isDeleted: false,
+      }).select('_id');
+
+      const matchedIds = matchedCategories.map((c) => c._id);
+
+      if (!filterConditions.$and) filterConditions.$and = [];
+      filterConditions.$and.push({
+        $or: [
+          { category: { $in: matchedIds } },
+          { category: { $regex: new RegExp(catVal, 'i') } },
+        ],
+      });
     }
   }
 
@@ -215,7 +257,7 @@ const getAllProducts = async (
     .paginate()
     .fields();
 
-  const data = await productQuery.modelQuery;
+  const data = await productQuery.modelQuery.populate('category', 'name slug image');
   const meta = await productQuery.countTotal();
 
   return {
@@ -246,7 +288,7 @@ const getProductByIdOrSlug = async (
     filter.status = PRODUCT_STATUS.ACTIVE;
   }
 
-  const product = await Product.findOne(filter);
+  const product = await Product.findOne(filter).populate('category', 'name slug image');
 
   if (!product) {
     throw new NotFoundError(
@@ -300,8 +342,29 @@ const updateProduct = async (
     }
   }
 
+  // Resolve category if provided
+  let categoryVal: any = payload.category;
+  if (payload.category) {
+    if (Types.ObjectId.isValid(payload.category)) {
+      categoryVal = new Types.ObjectId(payload.category);
+    } else {
+      const Category = (await import('../category/category.model')).default;
+      const cat = await Category.findOne({
+        $or: [
+          { name: { $regex: new RegExp(`^${payload.category.trim()}$`, 'i') } },
+          { slug: payload.category.trim().toLowerCase() },
+        ],
+        isDeleted: false,
+      });
+      if (cat) {
+        categoryVal = cat._id;
+      }
+    }
+  }
+
   // Apply payload to existing document and save to trigger pre-save hooks (auto discount, slug, variants)
   Object.assign(existingProduct, payload, {
+    ...(payload.category !== undefined ? { category: categoryVal } : {}),
     images: finalImages,
     brand: PRODUCT_BRAND,
   });
