@@ -8,11 +8,33 @@ import { connectSocket } from './socket/connectSocket';
 import seedingAdmin from './utilities/seeding';
 
 let server: HTTPServer;
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
+if (!process.env.VERCEL) {
+  try {
+    dns.setServers(["1.1.1.1", "8.8.8.8"]);
+  } catch (e) {
+    // ignore in environments that restrict dns mutation
+  }
+}
+
 // handle uncaught exception error
 process.on('uncaughtException', (error) => {
   console.log('uncaughtException error', error);
-  process.exit(1);
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
+});
+
+// Middleware to ensure DB connection in serverless environment
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    try {
+      await mongoose.connect(config.mongodb_url as string);
+    } catch (err) {
+      console.error('Database connection error in serverless:', err);
+      return next(err);
+    }
+  }
+  next();
 });
 
 const runServer = async () => {
@@ -20,22 +42,26 @@ const runServer = async () => {
     await mongoose.connect(config.mongodb_url as string);
     console.log('\x1b[32mDatabase has been connected successfully\x1b[0m');
 
-    initializeQuizCrons();
+    if (!process.env.VERCEL) {
+      initializeQuizCrons();
 
-    const host = '0.0.0.0';
+      const host = '0.0.0.0';
 
-    server = app.listen(config.server_port || 5002, host, () => {
-      console.log(
-        `\x1b[33mServer is listening on port http://${host}:${config.server_port || 5002}\x1b[0m`,
-      );
-    });
+      server = app.listen(config.server_port || 5002, host, () => {
+        console.log(
+          `\x1b[33mServer is listening on port http://${host}:${config.server_port || 5002}\x1b[0m`,
+        );
+      });
 
-    await seedingAdmin();     // await if it's async
-    connectSocket(server);
+      await seedingAdmin();     // await if it's async
+      connectSocket(server);
+    }
 
   } catch (err) {
     console.error('\x1b[31mFailed to start server:\x1b[0m', err);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 };
 

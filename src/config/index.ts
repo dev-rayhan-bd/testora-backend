@@ -42,7 +42,18 @@ const envSchema = z.object({
   STORAGE_DRIVER: z.enum(['auto', 'cloudinary', 's3']).default('auto'),
 });
 
-const envVars = envSchema.parse(process.env);
+let envVars: z.infer<typeof envSchema>;
+try {
+  envVars = envSchema.parse(process.env);
+} catch (error: any) {
+  if (error instanceof z.ZodError) {
+    console.error('\x1b[31m❌ Environment Variable Validation Error:\x1b[0m');
+    error.issues.forEach((err: any) => {
+      console.error(`  \x1b[33m- ${err.path.join('.')}: ${err.message}\x1b[0m`);
+    });
+  }
+  throw error;
+}
 
 export default {
   node_env: envVars.NODE_ENV,
