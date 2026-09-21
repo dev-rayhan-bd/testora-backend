@@ -32,18 +32,37 @@ const getAllUsers = async (query: Record<string, unknown>) => {
     
     // Status filter
     if (status) matchStage.status = status;
-    if (plan) {
-        if (typeof plan === 'string' && (plan.toLowerCase() === 'free' || plan.toLowerCase() === 'none')) {
+
+    // Plan filter
+    if (plan && typeof plan === 'string') {
+        const cleanPlan = plan.trim().toLowerCase();
+        if (cleanPlan === 'all' || cleanPlan === 'all plans') {
+            // No filter applied: returns all users
+        } else if (cleanPlan === 'free' || cleanPlan === 'none') {
             matchStage.$or = [
                 { plan: null },
                 { plan: { $exists: false } },
                 { plan: '' },
-                { plan: 'free' },
+                { plan: { $regex: /^free$/i } },
             ];
+        } else if (
+            cleanPlan === 'semi matura' ||
+            cleanPlan === 'semi_matura' ||
+            cleanPlan === 'semi-matura'
+        ) {
+            matchStage.$or = [
+                { plan: 'semi_matura' },
+                { plan: { $regex: /^semi[ _-]matura$/i } },
+            ];
+        } else if (cleanPlan === 'matura') {
+            matchStage.plan = { $regex: /^matura$/i };
+        } else if (cleanPlan === 'provime') {
+            matchStage.plan = { $regex: /^provime$/i };
         } else {
-            matchStage.plan = { $regex: new RegExp(`^${plan}$`, 'i') };
+            matchStage.plan = { $regex: new RegExp(`^${plan.trim()}$`, 'i') };
         }
     }
+
     if (role) matchStage.role = role;
     if (city) matchStage.city = city;
 
@@ -70,12 +89,43 @@ const getAllUsers = async (query: Record<string, unknown>) => {
                             fullName: 1,
                             email: 1,
                             avatar: 1,
-                            plan: { $ifNull: ['$plan', 'Free'] },
+                            plan: {
+                                $switch: {
+                                    branches: [
+                                        {
+                                            case: {
+                                                $in: ['$plan', ['matura', 'Matura']],
+                                            },
+                                            then: 'Matura',
+                                        },
+                                        {
+                                            case: {
+                                                $in: [
+                                                    '$plan',
+                                                    [
+                                                        'semi_matura',
+                                                        'Semi Matura',
+                                                        'semi-matura',
+                                                    ],
+                                                ],
+                                            },
+                                            then: 'Semi Matura',
+                                        },
+                                        {
+                                            case: {
+                                                $in: ['$plan', ['provime', 'Provime']],
+                                            },
+                                            then: 'Provime',
+                                        },
+                                    ],
+                                    default: { $ifNull: ['$plan', 'Free'] },
+                                },
+                            },
                             role: 1,
                             faculty: 1,
                             status: 1,
                             city: 1,
-                            createdAt: 1
+                            createdAt: 1,
                         },
                     },
                 ],
@@ -126,11 +176,23 @@ const updateUserStatus = async (userId: string, status: string) => {
 };
 
 const getUserById = async (userId: string) => {
-    const user = await User.findById(userId).select('-password').lean();
+    const user: any = await User.findById(userId).select('-password').lean();
     if (!user) {
         throw new NotFoundError('User not found.');
     }
-    return user;
+
+    const formatPlan = (p?: string) => {
+        if (!p) return 'Free';
+        if (/^semi[ _-]matura$/i.test(p)) return 'Semi Matura';
+        if (/^matura$/i.test(p)) return 'Matura';
+        if (/^provime$/i.test(p)) return 'Provime';
+        return p;
+    };
+
+    return {
+        ...user,
+        plan: formatPlan(user.plan),
+    };
 };
 
 export const userManagementService = {
