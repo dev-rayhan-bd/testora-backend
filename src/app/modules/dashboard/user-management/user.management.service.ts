@@ -32,7 +32,18 @@ const getAllUsers = async (query: Record<string, unknown>) => {
     
     // Status filter
     if (status) matchStage.status = status;
-    if (plan) matchStage.plan = plan;
+    if (plan) {
+        if (typeof plan === 'string' && (plan.toLowerCase() === 'free' || plan.toLowerCase() === 'none')) {
+            matchStage.$or = [
+                { plan: null },
+                { plan: { $exists: false } },
+                { plan: '' },
+                { plan: 'free' },
+            ];
+        } else {
+            matchStage.plan = { $regex: new RegExp(`^${plan}$`, 'i') };
+        }
+    }
     if (role) matchStage.role = role;
     if (city) matchStage.city = city;
 
@@ -59,7 +70,7 @@ const getAllUsers = async (query: Record<string, unknown>) => {
                             fullName: 1,
                             email: 1,
                             avatar: 1,
-                            plan: 1,
+                            plan: { $ifNull: ['$plan', 'Free'] },
                             role: 1,
                             faculty: 1,
                             status: 1,
