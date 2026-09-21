@@ -61,3 +61,5 @@ process.on('SIGTERM', () => {
 });
 
 runServer();
+
+export default app;
