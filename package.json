@@ -6,6 +6,7 @@
     "start": "node dist/server.js",
     "dev": "cross-env NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
+    "postinstall": "tsc",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write ."
@@ -48,7 +49,8 @@
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xlsx": "^0.18.5",
-    "zod": "^4.1.11"
+    "zod": "^4.1.11",
+    "typescript": "^6.0.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
