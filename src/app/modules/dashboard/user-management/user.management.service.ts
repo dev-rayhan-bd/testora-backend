@@ -1,6 +1,5 @@
 import User from "../../user/user.model";
-
-
+import { BadRequestError, NotFoundError } from "../../../errors/request/apiError";
 
 const getUserStats = async () => {
     const [
@@ -27,15 +26,17 @@ const getUserStats = async () => {
 
 // get all users
 const getAllUsers = async (query: Record<string, unknown>) => {
-    const { page = 1, limit = 10, searchTerm, status, plan } = query;
+    const { page = 1, limit = 10, searchTerm, status, plan, role, city } = query;
 
     const matchStage: any = {};
     
     // Status filter
     if (status) matchStage.status = status;
     if (plan) matchStage.plan = plan;
+    if (role) matchStage.role = role;
+    if (city) matchStage.city = city;
 
-    // Search Term logic add kora hoyeche
+    // Search Term logic
     if (searchTerm) {
         matchStage.$or = [
             { fullName: { $regex: searchTerm, $options: 'i' } },
@@ -53,11 +54,13 @@ const getAllUsers = async (query: Record<string, unknown>) => {
                     { $limit: Number(limit) },
                     {
                         $project: {
-                            _id: 0,
+                            _id: 1,
+                            id: '$_id',
                             fullName: 1,
                             email: 1,
                             avatar: 1,
                             plan: 1,
+                            role: 1,
                             faculty: 1,
                             status: 1,
                             city: 1,
@@ -70,7 +73,6 @@ const getAllUsers = async (query: Record<string, unknown>) => {
         },
     ]);
 
-    // Data handling securely check kora hoyeche jeno array empty thakle crash na kore
     const users = result[0]?.data || [];
     const total = result[0]?.total[0]?.count || 0;
 
@@ -89,7 +91,40 @@ const getAllUsers = async (query: Record<string, unknown>) => {
     };
 };
 
+const updateUserStatus = async (userId: string, status: string) => {
+    const validStatuses = ['active', 'blocked', 'disabled'];
+    if (!validStatuses.includes(status)) {
+        throw new BadRequestError(
+            `Invalid status '${status}'. Must be one of: ${validStatuses.join(', ')}`
+        );
+    }
+
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { status },
+        { new: true, runValidators: true }
+    )
+        .select('-password')
+        .lean();
+
+    if (!user) {
+        throw new NotFoundError('User not found.');
+    }
+
+    return user;
+};
+
+const getUserById = async (userId: string) => {
+    const user = await User.findById(userId).select('-password').lean();
+    if (!user) {
+        throw new NotFoundError('User not found.');
+    }
+    return user;
+};
+
 export const userManagementService = {
     getUserStats,
-    getAllUsers
-}
+    getAllUsers,
+    updateUserStatus,
+    getUserById,
+};

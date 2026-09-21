@@ -19,5 +19,16 @@ userManagementRouter.get(
     userManagementController.getAllUsersIntoDb,
 );
 
+userManagementRouter.get(
+    '/:id',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    userManagementController.getUserByIdIntoDb,
+);
+
+userManagementRouter.patch(
+    '/:id/status',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    userManagementController.updateUserStatusIntoDb,
+);
 
 export default userManagementRouter;
