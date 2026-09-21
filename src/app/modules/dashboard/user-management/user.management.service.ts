@@ -2,16 +2,20 @@ import User from "../../user/user.model";
 import { BadRequestError, NotFoundError } from "../../../errors/request/apiError";
 
 const getUserStats = async () => {
+    const baseFilter = {
+        deletedAt: null,
+        role: { $nin: ['admin', 'super-admin'] },
+    };
+
     const [
         totalUsers,
         allUsers,
     ] = await Promise.all([
-        User.countDocuments(),
-        User.find({})
-            .lean(),
+        User.countDocuments(baseFilter),
+        User.find(baseFilter).lean(),
     ]);
 
-   console.log("Total users:", totalUsers);
+    console.log("Total students/users:", totalUsers);
     const activeAccountUsers = allUsers.filter((u) => u.status === 'active').length;
     const blockedAccountUsers = allUsers.filter((u) => u.status === 'blocked').length;
     const disabledAccountUsers = allUsers.filter((u) => u.status === 'disabled').length;
@@ -28,10 +32,13 @@ const getUserStats = async () => {
 const getAllUsers = async (query: Record<string, unknown>) => {
     const { page = 1, limit = 10, searchTerm, status, plan, role, city } = query;
 
-    const matchStage: any = {};
+    const andConditions: any[] = [
+        { deletedAt: null },
+        { role: { $nin: ['admin', 'super-admin'] } },
+    ];
     
     // Status filter
-    if (status) matchStage.status = status;
+    if (status) andConditions.push({ status });
 
     // Plan filter
     if (plan && typeof plan === 'string') {
@@ -39,40 +46,50 @@ const getAllUsers = async (query: Record<string, unknown>) => {
         if (cleanPlan === 'all' || cleanPlan === 'all plans') {
             // No filter applied: returns all users
         } else if (cleanPlan === 'free' || cleanPlan === 'none') {
-            matchStage.$or = [
-                { plan: null },
-                { plan: { $exists: false } },
-                { plan: '' },
-                { plan: { $regex: /^free$/i } },
-            ];
+            andConditions.push({
+                $or: [
+                    { plan: null },
+                    { plan: { $exists: false } },
+                    { plan: '' },
+                    { plan: { $regex: /^free$/i } },
+                ],
+            });
         } else if (
             cleanPlan === 'semi matura' ||
             cleanPlan === 'semi_matura' ||
             cleanPlan === 'semi-matura'
         ) {
-            matchStage.$or = [
-                { plan: 'semi_matura' },
-                { plan: { $regex: /^semi[ _-]matura$/i } },
-            ];
+            andConditions.push({
+                $or: [
+                    { plan: 'semi_matura' },
+                    { plan: { $regex: /^semi[ _-]matura$/i } },
+                ],
+            });
         } else if (cleanPlan === 'matura') {
-            matchStage.plan = { $regex: /^matura$/i };
+            andConditions.push({ plan: { $regex: /^matura$/i } });
         } else if (cleanPlan === 'provime') {
-            matchStage.plan = { $regex: /^provime$/i };
+            andConditions.push({ plan: { $regex: /^provime$/i } });
         } else {
-            matchStage.plan = { $regex: new RegExp(`^${plan.trim()}$`, 'i') };
+            andConditions.push({ plan: { $regex: new RegExp(`^${plan.trim()}$`, 'i') } });
         }
     }
 
-    if (role) matchStage.role = role;
-    if (city) matchStage.city = city;
+    if (role && !['admin', 'super-admin'].includes(String(role).toLowerCase())) {
+        andConditions.push({ role });
+    }
+    if (city) andConditions.push({ city });
 
     // Search Term logic
     if (searchTerm) {
-        matchStage.$or = [
-            { fullName: { $regex: searchTerm, $options: 'i' } },
-            { email: { $regex: searchTerm, $options: 'i' } }
-        ];
+        andConditions.push({
+            $or: [
+                { fullName: { $regex: searchTerm, $options: 'i' } },
+                { email: { $regex: searchTerm, $options: 'i' } },
+            ],
+        });
     }
+
+    const matchStage = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const result = await User.aggregate([
         { $match: matchStage },
@@ -176,7 +193,13 @@ const updateUserStatus = async (userId: string, status: string) => {
 };
 
 const getUserById = async (userId: string) => {
-    const user: any = await User.findById(userId).select('-password').lean();
+    const user: any = await User.findOne({
+        _id: userId,
+        deletedAt: null,
+        role: { $nin: ['admin', 'super-admin'] },
+    })
+        .select('-password')
+        .lean();
     if (!user) {
         throw new NotFoundError('User not found.');
     }
