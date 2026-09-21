@@ -2988,9 +2988,9 @@
                   "formdata": [
                     {
                       "key": "data",
-                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"Study Materials\",\n  \"lowStockAlert\": 10,\n  \"variants\": [\n    {\n      \"color\": \"Navy Blue\",\n      \"size\": \"Standard\",\n      \"price\": 39.99,\n      \"stock\": 100\n    }\n  ]\n}",
+                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"{{categoryId}}\",\n  \"lowStockAlert\": 10,\n  \"variants\": [\n    {\n      \"color\": \"Navy Blue\",\n      \"size\": \"Standard\",\n      \"price\": 39.99,\n      \"stock\": 100\n    }\n  ]\n}",
                       "type": "text",
-                      "description": "Product JSON metadata (supports variants, status, price, etc.)"
+                      "description": "Product JSON metadata. NOTE: 'category' strictly requires a valid 24-character Category ObjectId (e.g. {{categoryId}})."
                     },
                     {
                       "key": "images",
@@ -3008,7 +3008,7 @@
                     "products"
                   ]
                 },
-                "description": "Create a new branded product using multipart/form-data. Upload image files directly; the storage engine automatically routes to Cloudinary or AWS S3."
+                "description": "Create a new branded product using multipart/form-data. Upload image files directly; the storage engine automatically routes to Cloudinary or AWS S3. Category field strictly accepts Category ObjectId."
               },
               "event": [
                 {

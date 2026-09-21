@@ -47,9 +47,11 @@ const createProductSchema = z
       })
       .default('draft'),
     category: z
-      .string({ message: 'Product category is required' })
+      .string({ message: 'Product category ID is required' })
       .trim()
-      .min(1, { message: 'Category cannot be empty' }),
+      .regex(/^[0-9a-fA-F]{24}$/, {
+        message: 'Invalid Category ID. Must be a valid 24-character hexadecimal ObjectId',
+      }),
     brand: z.literal('Testora').default('Testora'),
     images: z
       .array(
@@ -112,9 +114,11 @@ const updateProductSchema = z
       })
       .optional(),
     category: z
-      .string({ message: 'Category must be a string' })
+      .string({ message: 'Category ID must be a string' })
       .trim()
-      .min(1, { message: 'Category cannot be empty' })
+      .regex(/^[0-9a-fA-F]{24}$/, {
+        message: 'Invalid Category ID. Must be a valid 24-character hexadecimal ObjectId',
+      })
       .optional(),
     brand: z.literal('Testora').optional(),
     images: z

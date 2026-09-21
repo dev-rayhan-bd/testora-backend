@@ -13,6 +13,7 @@ import {
   IStockCheckResult,
 } from './product.interface';
 import Product from './product.model';
+import Category from '../category/category.model';
 import Order from '../order/order.model';
 import { ORDER_STATUS } from '../order/order.constant';
 import {
@@ -49,28 +50,28 @@ const createProduct = async (
     finalImages = [...finalImages, ...uploadedUrls];
   }
 
-  // Resolve category if matching Category document exists
-  let categoryVal: any = payload.category;
-  if (Types.ObjectId.isValid(payload.category)) {
-    categoryVal = new Types.ObjectId(payload.category);
-  } else if (payload.category) {
-    const Category = (await import('../category/category.model')).default;
-    const cat = await Category.findOne({
-      $or: [
-        { name: { $regex: new RegExp(`^${payload.category.trim()}$`, 'i') } },
-        { slug: payload.category.trim().toLowerCase() },
-      ],
-      isDeleted: false,
-    });
-    if (cat) {
-      categoryVal = cat._id;
-    }
+  // Strictly validate category by Category ID
+  if (!Types.ObjectId.isValid(payload.category)) {
+    throw new BadRequestError(
+      'Invalid Category ID. Must be a 24-character hexadecimal ObjectId.',
+    );
   }
+
+  const categoryExists = await Category.findOne({
+    _id: payload.category,
+    isDeleted: false,
+  });
+
+  if (!categoryExists) {
+    throw new NotFoundError('Category not found with the provided Category ID.');
+  }
+
+  const categoryId = new Types.ObjectId(payload.category);
 
   // Enforce enterprise brand
   const productData = {
     ...payload,
-    category: categoryVal,
+    category: categoryId,
     images: finalImages,
     brand: PRODUCT_BRAND,
     isDeleted: false,
@@ -342,29 +343,30 @@ const updateProduct = async (
     }
   }
 
-  // Resolve category if provided
-  let categoryVal: any = payload.category;
+  // Strictly validate category by Category ID if updated
+  let categoryVal: Types.ObjectId | undefined = undefined;
   if (payload.category) {
-    if (Types.ObjectId.isValid(payload.category)) {
-      categoryVal = new Types.ObjectId(payload.category);
-    } else {
-      const Category = (await import('../category/category.model')).default;
-      const cat = await Category.findOne({
-        $or: [
-          { name: { $regex: new RegExp(`^${payload.category.trim()}$`, 'i') } },
-          { slug: payload.category.trim().toLowerCase() },
-        ],
-        isDeleted: false,
-      });
-      if (cat) {
-        categoryVal = cat._id;
-      }
+    if (!Types.ObjectId.isValid(payload.category)) {
+      throw new BadRequestError(
+        'Invalid Category ID. Must be a 24-character hexadecimal ObjectId.',
+      );
     }
+
+    const categoryExists = await Category.findOne({
+      _id: payload.category,
+      isDeleted: false,
+    });
+
+    if (!categoryExists) {
+      throw new NotFoundError('Category not found with the provided Category ID.');
+    }
+
+    categoryVal = new Types.ObjectId(payload.category);
   }
 
   // Apply payload to existing document and save to trigger pre-save hooks (auto discount, slug, variants)
   Object.assign(existingProduct, payload, {
-    ...(payload.category !== undefined ? { category: categoryVal } : {}),
+    ...(categoryVal ? { category: categoryVal } : {}),
     images: finalImages,
     brand: PRODUCT_BRAND,
   });

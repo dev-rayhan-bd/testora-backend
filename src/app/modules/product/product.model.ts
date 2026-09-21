@@ -122,7 +122,7 @@ const productSchema = new Schema<IProductDocument, IProductModel>(
       index: true,
     },
     category: {
-      type: Schema.Types.Mixed,
+      type: Schema.Types.ObjectId,
       ref: 'Category',
       required: [true, 'Product category is required'],
       index: true,
@@ -163,9 +163,8 @@ productSchema.index({ title: 1, status: 1 });
 productSchema.index({ status: 1, isDeleted: 1 });
 productSchema.index({ price: 1, status: 1 });
 productSchema.index({ category: 1, status: 1 });
-productSchema.index({ sku: 1 });
 productSchema.index({ 'variants.sku': 1 });
-productSchema.index({ title: 'text', description: 'text', category: 'text', sku: 'text' });
+productSchema.index({ title: 'text', description: 'text', sku: 'text' });
 
 // ── Static helper to check slug uniqueness ──────────────────────────────────
 productSchema.statics.isSlugTaken = async function (
