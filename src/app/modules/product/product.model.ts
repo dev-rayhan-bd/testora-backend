@@ -118,7 +118,7 @@ const productSchema = new Schema<IProductDocument, IProductModel>(
         values: Object.values(PRODUCT_STATUS),
         message: 'Status must be draft, active, or hidden',
       },
-      default: PRODUCT_STATUS.ACTIVE,
+      default: PRODUCT_STATUS.DRAFT,
       index: true,
     },
     category: {
