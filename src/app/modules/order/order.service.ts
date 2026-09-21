@@ -138,6 +138,7 @@ const createCheckoutOrder = async (
       const couponResult = await couponService.validateAndCalculateDiscount(
         payload.couponCode,
         subtotal,
+        userId,
       );
 
       discountAmount = couponResult.discountAmount;

@@ -3651,7 +3651,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue, Suite 400\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"cash_on_delivery\",\n  \"couponCode\": \"{{couponCode}}\",\n  \"customerNotes\": \"Please call before delivery\"\n}"
+                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue, Suite 400\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"cash_on_delivery\",\n  \"couponCode\": \"TESTORA20\",\n  \"customerNotes\": \"Please call before delivery\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/orders/checkout",
@@ -3713,7 +3713,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"stripe\"\n}"
+                  "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Jane Doe\",\n    \"phoneNumber\": \"+14155552671\",\n    \"streetAddress\": \"123 Testora Avenue\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"United States\"\n  },\n  \"paymentMethod\": \"stripe\",\n  \"couponCode\": \"TESTORA20\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/orders/checkout",

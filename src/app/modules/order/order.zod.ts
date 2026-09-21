@@ -40,22 +40,53 @@ const shippingAddressSchema = z.object({
   country: z.string().trim().default('Kosovo'),
 });
 
-const checkoutSchema = z.object({
-  items: z
-    .array(checkoutItemSchema, { message: 'Items array is required' })
-    .min(1, { message: 'Order must contain at least one item' }),
-  shippingAddress: shippingAddressSchema,
-  paymentMethod: z.enum(['cash_on_delivery', 'stripe'], {
-    message: 'Payment method must be cash_on_delivery or stripe',
+const preprocessCheckoutPayload = (val: any) => {
+  if (val && typeof val === 'object') {
+    const obj = { ...val };
+    // Map alias coupon / coupon_code -> couponCode
+    if (obj.coupon !== undefined && obj.couponCode === undefined) {
+      obj.couponCode = obj.coupon;
+    }
+    if (obj.coupon_code !== undefined && obj.couponCode === undefined) {
+      obj.couponCode = obj.coupon_code;
+    }
+    // Map items: allow 'product' as alias for 'productId'
+    if (Array.isArray(obj.items)) {
+      obj.items = obj.items.map((it: any) => {
+        if (it && typeof it === 'object') {
+          const itemCopy = { ...it };
+          if (itemCopy.product !== undefined && itemCopy.productId === undefined) {
+            itemCopy.productId = itemCopy.product;
+          }
+          return itemCopy;
+        }
+        return it;
+      });
+    }
+    return obj;
+  }
+  return val;
+};
+
+const checkoutSchema = z.preprocess(
+  preprocessCheckoutPayload,
+  z.object({
+    items: z
+      .array(checkoutItemSchema, { message: 'Items array is required' })
+      .min(1, { message: 'Order must contain at least one item' }),
+    shippingAddress: shippingAddressSchema,
+    paymentMethod: z.enum(['cash_on_delivery', 'stripe'], {
+      message: 'Payment method must be cash_on_delivery or stripe',
+    }),
+    couponCode: z.string().trim().optional(),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(8, { message: 'Idempotency key must be at least 8 characters' })
+      .optional(),
+    notes: z.string().trim().optional(),
   }),
-  couponCode: z.string().trim().optional(),
-  idempotencyKey: z
-    .string()
-    .trim()
-    .min(8, { message: 'Idempotency key must be at least 8 characters' })
-    .optional(),
-  notes: z.string().trim().optional(),
-});
+);
 
 const updateOrderStatusSchema = z.object({
   status: z.enum(
