@@ -3406,6 +3406,69 @@
               }
             }
           ]
+        },
+        {
+          "name": "Shipping & Delivery Management",
+          "description": "Admin APIs to manage shipping fee, free shipping threshold rules, and toggle site-wide free delivery.",
+          "item": [
+            {
+              "name": "Get Current Shipping Settings (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/shipping",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "shipping"
+                  ]
+                },
+                "description": "View current active shipping fee rules, threshold, and audit details."
+              }
+            },
+            {
+              "name": "Update Shipping Settings (Admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminAccessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"defaultShippingFee\": 5,\n  \"freeShippingThreshold\": 50,\n  \"isFreeShippingEnabled\": false,\n  \"estimatedDeliveryDays\": \"2-4 business days\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/shipping",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "shipping"
+                  ]
+                },
+                "description": "Update default shipping fee, free shipping threshold, or enable site-wide free delivery."
+              }
+            }
+          ]
         }
       ]
     },
@@ -3836,111 +3899,54 @@
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "12. Shipping & Delivery Configuration",
-      "description": "Enterprise shipping rate management, free shipping threshold rules, and storefront calculation APIs",
-      "item": [
-        {
-          "name": "Get Active Shipping Settings (Public Storefront)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/shipping",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "shipping"
-              ]
-            },
-            "description": "Returns active shipping fee, free shipping threshold, and estimated delivery timeline for storefront cart banners."
-          }
         },
         {
-          "name": "Calculate Shipping Fee (Cart Helper)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/shipping/calculate?subtotal=29.99",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "shipping",
-                "calculate"
-              ],
-              "query": [
-                {
-                  "key": "subtotal",
-                  "value": "29.99",
-                  "description": "Cart subtotal to evaluate shipping fee and remaining amount for free delivery"
-                }
-              ]
-            },
-            "description": "Dynamically calculates whether the customer qualifies for free shipping and how much more they need to spend."
-          }
-        },
-        {
-          "name": "Get Shipping Settings (Admin Dashboard)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAccessToken}}",
-                "type": "text"
+          "name": "Shipping & Delivery Rates",
+          "description": "Public storefront endpoints to fetch active shipping rates and calculate shipping fees for the cart.",
+          "item": [
+            {
+              "name": "Get Active Shipping Rates (Storefront Banner)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/shipping",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "shipping"
+                  ]
+                },
+                "description": "Fetch active shipping rates, threshold, and estimated delivery timeline for storefront banners."
               }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/shipping",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "shipping"
-              ]
             },
-            "description": "Admin endpoint to view current shipping fee rules and audit info."
-          }
-        },
-        {
-          "name": "Update Shipping Settings (Admin Dashboard)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminAccessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+            {
+              "name": "Calculate Shipping Fee (Cart Helper)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/shipping/calculate?subtotal=29.99",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "shipping",
+                    "calculate"
+                  ],
+                  "query": [
+                    {
+                      "key": "subtotal",
+                      "value": "29.99",
+                      "description": "Cart subtotal to check if free delivery applies and calculate fee"
+                    }
+                  ]
+                },
+                "description": "Dynamically calculate shipping fee for cart and amount needed for free delivery."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"defaultShippingFee\": 5,\n  \"freeShippingThreshold\": 50,\n  \"isFreeShippingEnabled\": false,\n  \"estimatedDeliveryDays\": \"2-4 business days\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/shipping",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "shipping"
-              ]
-            },
-            "description": "Admin endpoint to adjust default shipping fee, free shipping threshold, or toggle store-wide free shipping."
-          }
+            }
+          ]
         }
       ]
     }
