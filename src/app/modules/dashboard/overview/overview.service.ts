@@ -7,6 +7,7 @@ import Blog from "../../blog/blog.model";
 import Product from "../../product/product.model";
 import Order from "../../order/order.model";
 import Faculty from "../../faculty/faculty.model";
+import Category from "../../category/category.model";
 import { QuizSession } from "../../quiz-session/quiz.session.model";
 
 // ── 1. Legacy / Standalone: Stats Overview ──────────────────────────────────
@@ -116,15 +117,13 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
     testsThisMonth,
     totalBlogs,
     blogsThisWeek,
-    unpublishedBlogs,
     totalProducts,
     productsThisMonth,
-    testsMissingQuestions,
-    ordersPending,
-    expiringSubscriptions,
     subscriptionsByPlan,
     sessionsByCategory,
-    facultiesList,
+    dbProducts,
+    dbCategories,
+    productSalesRaw,
   ] = await Promise.all([
     // 1. User stats aggregation
     User.aggregate([
@@ -181,22 +180,10 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
     Test.countDocuments({ createdAt: { $gte: startOfMonth } }),
     Blog.countDocuments({}),
     Blog.countDocuments({ createdAt: { $gte: startOfWeek } }),
-    Blog.countDocuments({ status: { $ne: 'published' } }),
     Product.countDocuments({ isDeleted: false, status: 'active' }),
     Product.countDocuments({ isDeleted: false, createdAt: { $gte: startOfMonth } }),
 
-    // 5. Content Alerts
-    Test.countDocuments({
-      isActive: true,
-      $or: [{ totalQuestions: { $lte: 0 } }, { totalQuestions: null }],
-    }),
-    Order.countDocuments({ orderStatus: 'pending' }),
-    Subscription.countDocuments({
-      status: SUBSCRIPTION_STATUS.ACTIVE,
-      expiryDate: { $gte: now, $lte: next7Days },
-    }),
-
-    // 6. Subscriptions by plan
+    // 5. Subscriptions by plan
     Subscription.aggregate([
       { $match: { status: SUBSCRIPTION_STATUS.ACTIVE } },
       {
@@ -208,7 +195,7 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
       },
     ]),
 
-    // 7. Sessions by Category
+    // 6. Sessions by Category
     QuizSession.aggregate([
       {
         $group: {
@@ -219,8 +206,31 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
       { $sort: { count: -1 } },
     ]),
 
-    // 8. Faculties
-    Faculty.find({ isActive: true }).select('name slug').lean(),
+    // 7. Real Products from DB
+    Product.find({ isDeleted: false })
+      .select('_id title price images stock category createdAt')
+      .sort({ createdAt: -1 })
+      .lean(),
+
+    // 8. Real Categories from DB
+    Category.find({ isDeleted: false })
+      .select('_id name slug')
+      .sort({ createdAt: 1 })
+      .lean(),
+
+    // 9. Real Product Sales from Orders
+    Order.aggregate([
+      { $match: { orderStatus: { $ne: 'cancelled' } } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product',
+          totalSold: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: '$items.totalPrice' },
+          uniqueBuyers: { $addToSet: '$user' },
+        },
+      },
+    ]),
   ]);
 
   // ── Format User Stats ──
@@ -249,29 +259,63 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
     joinedDate: u.createdAt,
   }));
 
-  // ── Format Premium Users By Product ──
-  const targetProducts = [
-    'Matura',
-    'Medicine',
-    'Law',
-    'Economics',
-    'Semimatura',
-    'Other Faculties',
-    'Architecture',
-  ];
+  // ── Format Product Sales Map from Orders ──
+  const salesMap = new Map<
+    string,
+    { totalSold: number; totalRevenue: number; buyersCount: number }
+  >();
+  let totalUnitsSold = 0;
+  let totalMarketplaceRevenue = 0;
 
-  const productsBreakdown = targetProducts.map((pName) => {
-    const matched = subscriptionsByPlan.find(
-      (s) => s._id && String(s._id).toLowerCase() === pName.toLowerCase(),
-    );
-    const count = matched ? matched.count : 0;
-    const percentage = totalPremium > 0 ? Number(((count / totalPremium) * 100).toFixed(1)) : 0;
+  productSalesRaw.forEach((item: any) => {
+    if (item._id) {
+      const pId = item._id.toString();
+      const sold = item.totalSold || 0;
+      const revenue = item.totalRevenue || 0;
+      const buyers = item.uniqueBuyers ? item.uniqueBuyers.length : 0;
+      salesMap.set(pId, {
+        totalSold: sold,
+        totalRevenue: revenue,
+        buyersCount: buyers,
+      });
+      totalUnitsSold += sold;
+      totalMarketplaceRevenue += revenue;
+    }
+  });
+
+  // ── Format Premium Users By Product (from actual DB products) ──
+  const productsBreakdown = dbProducts.map((p: any) => {
+    const pId = p._id.toString();
+    const sales = salesMap.get(pId) || {
+      totalSold: 0,
+      totalRevenue: 0,
+      buyersCount: 0,
+    };
+    const count = sales.totalSold;
+    const percentage =
+      totalUnitsSold > 0
+        ? Number(((count / totalUnitsSold) * 100).toFixed(1))
+        : 0;
+
     return {
-      name: pName,
+      id: p._id,
+      name: p.title,
       count,
       percentage,
+      revenue: Number(sales.totalRevenue.toFixed(2)),
+      users: sales.buyersCount,
+      stock: p.stock,
+      price: p.price,
+      image: p.images && p.images[0] ? p.images[0] : null,
     };
   });
+
+  const sortedProducts = [...productsBreakdown].sort(
+    (a, b) => b.count - a.count || b.revenue - a.revenue,
+  );
+  const topProduct = sortedProducts[0] || { name: 'None', users: 0, count: 0 };
+  const latestProduct =
+    dbProducts[0] ? { name: dbProducts[0].title } : { name: 'None' };
 
   // ── Format Content Summary ──
   const contentSummary = {
@@ -297,98 +341,49 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
     },
   };
 
-  // ── Format Content Alerts ──
-  const contentAlerts = {
-    totalAlerts:
-      draftQuestions +
-      testsMissingQuestions +
-      ordersPending +
-      expiringSubscriptions +
-      unpublishedBlogs,
-    draftQuestionsPending: {
-      count: draftQuestions,
-      label: 'Draft questions pending',
-      description: `${draftQuestions} questions waiting for review and approval`,
-    },
-    testsMissingQuestions: {
-      count: testsMissingQuestions,
-      label: 'Tests missing question',
-      description: `${testsMissingQuestions} tests have fewer than the required minimum questions`,
-    },
-    ordersRequiringAttention: {
-      count: ordersPending,
-      label: 'Orders requiring attention',
-      description: `${ordersPending} marketplace orders need manual confirmation`,
-    },
-    expiringSubscriptions: {
-      count: expiringSubscriptions,
-      label: 'Expiring subscription',
-      description: `${expiringSubscriptions} subscriptions expire within the next 7 days`,
-    },
-    unpublishedBlogs: {
-      count: unpublishedBlogs,
-      label: 'Unpublished blog post',
-      description: `${unpublishedBlogs} draft posts are ready to be published`,
-    },
-  };
-
-  // ── Format Most Used Category (Donut Chart) ──
-  const defaultCategories = [
-    { name: 'Entrance Exams', count: 0 },
-    { name: 'Matura', count: 0 },
-    { name: 'Semimatura', count: 0 },
-  ];
-
-  let totalCategoryUsage = 0;
-  const categoriesWithCounts = defaultCategories.map((cat) => {
-    const found = sessionsByCategory.find(
-      (s) => s._id && String(s._id).toLowerCase() === cat.name.toLowerCase().replace(' ', '_'),
-    );
-    const count = found ? found.count : 0;
-    totalCategoryUsage += count;
-    return { name: cat.name, count };
+  // ── Format Most Used Category from Real DB Categories ──
+  const categoryCounts = new Map<string, number>();
+  dbProducts.forEach((p: any) => {
+    const cId = p.category?.toString();
+    if (cId) {
+      categoryCounts.set(cId, (categoryCounts.get(cId) || 0) + 1);
+    }
   });
 
+  const totalCatCount = dbProducts.length;
+  const categoriesBreakdown = dbCategories.map((cat: any) => {
+    const cId = cat._id.toString();
+    const count = categoryCounts.get(cId) || 0;
+    const percentage =
+      totalCatCount > 0
+        ? Number(((count / totalCatCount) * 100).toFixed(1))
+        : 0;
+    return {
+      id: cat._id,
+      name: cat.name,
+      slug: cat.slug,
+      count,
+      percentage,
+    };
+  });
+
+  const sortedCategories = [...categoriesBreakdown].sort(
+    (a, b) => b.count - a.count,
+  );
   const categoryDistribution = {
-    totalUsers: totalCategoryUsage > 0 ? totalCategoryUsage : stats.totalUsers,
-    categories: categoriesWithCounts.map((c) => ({
-      name: c.name,
-      count: c.count,
-      percentage:
-        totalCategoryUsage > 0
-          ? Number(((c.count / totalCategoryUsage) * 100).toFixed(1))
-          : c.name === 'Entrance Exams'
-          ? 60
-          : c.name === 'Matura'
-          ? 30
-          : 10,
-    })),
+    totalUsers: totalCatCount > 0 ? totalCatCount : stats.totalUsers,
+    categories: categoriesBreakdown,
     mostUsedThisMonth:
-      categoriesWithCounts.sort((a, b) => b.count - a.count)[0]?.name || 'Entrance Exams',
+      sortedCategories[0]?.name || 'Books & Study Materials',
   };
 
-  // ── Plan Summary Snapshot ──
-  const planSummary = {
-    planSnapshot: [
-      { name: 'Matura', percentage: 75 },
-      { name: 'Medicine', percentage: 55 },
-      { name: 'Law', percentage: 35 },
-    ],
-    salesNotes: [
-      {
-        name: 'Matura',
-        revenue: 24840,
-        users: 3480,
-        change: '+22.3%',
-      },
-      {
-        name: 'Medicine',
-        revenue: 18750,
-        users: 2450,
-        change: '+18.1%',
-      },
-    ],
-  };
+  // ── Real Sales Notes from DB Products ──
+  const salesNotes = productsBreakdown.map((p) => ({
+    name: p.name,
+    revenue: p.revenue,
+    users: p.users,
+    change: p.count > 0 ? `+${p.count} sold` : 'In Stock',
+  }));
 
   return {
     year,
@@ -396,33 +391,35 @@ const getCompleteDashboardOverview = async (targetYear?: number) => {
       totalUsers: stats.totalUsers,
       activeAccounts: stats.activeAccounts,
       blockedAccounts: stats.blockedAccounts,
-      premiumUsers: totalPremium,
+      premiumUsers: totalPremium > 0 ? totalPremium : totalUnitsSold,
       growthRate: '+12%',
     },
     userGrowth,
     premiumUsersByProduct: {
-      totalPremiumUsers: totalPremium,
+      totalPremiumUsers: totalPremium > 0 ? totalPremium : totalUnitsSold,
       products: productsBreakdown,
       insights: {
         topProduct: {
-          name: 'Matura',
-          users: productsBreakdown.find((p) => p.name === 'Matura')?.count || 0,
+          name: topProduct.name,
+          users: topProduct.users || topProduct.count,
         },
         fastestGrowing: {
-          name: 'Medicine',
-          rate: '+18.2% this year',
+          name: sortedProducts[1]?.name || topProduct.name,
+          rate:
+            sortedProducts[1]?.count > 0
+              ? `+${sortedProducts[1].count} sold`
+              : 'High demand',
         },
         latestAccepted: {
-          name: 'Law',
-          newUsers: productsBreakdown.find((p) => p.name === 'Law')?.count || 0,
+          name: latestProduct.name,
+          newUsers: dbProducts.length,
         },
       },
     },
     recentUsers,
     contentSummary,
-    contentAlerts,
     categoryDistribution,
-    planSummary,
+    salesNotes,
   };
 };
 
