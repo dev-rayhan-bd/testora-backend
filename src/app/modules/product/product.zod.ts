@@ -13,7 +13,9 @@ const productVariantSchema = z.object({
     .int({ message: 'Variant stock must be an integer' })
     .min(0, { message: 'Variant stock cannot be negative' })
     .default(0),
-  image: z.string().url({ message: 'Variant image must be a valid URL' }).optional(),
+  image: z
+    .string({ message: 'Variant image is required' })
+    .url({ message: 'Variant image must be a valid URL' }),
 });
 
 const createProductSchema = z

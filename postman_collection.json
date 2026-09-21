@@ -3019,9 +3019,9 @@
                   "formdata": [
                     {
                       "key": "data",
-                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"{{categoryId}}\",\n  \"lowStockAlert\": 10,\n  \"variants\": [\n    {\n      \"color\": \"Navy Blue\",\n      \"size\": \"Standard\",\n      \"price\": 39.99,\n      \"stock\": 100\n    }\n  ]\n}",
+                      "value": "{\n  \"title\": \"Testora Premium Exam Preparation Kit 2024\",\n  \"description\": \"Comprehensive study package including official past papers, formula sheets, and practice exams.\",\n  \"price\": 39.99,\n  \"compareAtPrice\": 59.99,\n  \"stock\": 150,\n  \"status\": \"active\",\n  \"category\": \"{{categoryId}}\",\n  \"lowStockAlert\": 10,\n  \"variants\": [\n    {\n      \"color\": \"Navy Blue\",\n      \"size\": \"Standard\",\n      \"price\": 39.99,\n      \"stock\": 100,\n      \"image\": \"https://res.cloudinary.com/da1uxchgo/image/upload/v1789970086/products/hqy4sud6shqzpuc51bpx.webp\"\n    }\n  ]\n}",
                       "type": "text",
-                      "description": "Product JSON metadata. NOTE: 'category' strictly requires a valid 24-character Category ObjectId (e.g. {{categoryId}})."
+                      "description": "Product JSON metadata. NOTE: Each variant now requires an 'image' URL for color-based image switching on the frontend."
                     },
                     {
                       "key": "images",

@@ -12,7 +12,7 @@ export interface IProductVariant {
   discountPercentage?: number;
   savingsAmount?: number;
   stock: number;
-  image?: string;
+  image: string;
 }
 
 export interface IProduct extends Document {

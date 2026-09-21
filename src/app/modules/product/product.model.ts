@@ -47,6 +47,7 @@ const productVariantSchema = new Schema<IProductVariant>(
     },
     image: {
       type: String,
+      required: [true, 'Variant image is required'],
       trim: true,
     },
   },

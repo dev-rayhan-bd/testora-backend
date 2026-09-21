@@ -68,6 +68,24 @@ const createProduct = async (
 
   const categoryId = new Types.ObjectId(payload.category);
 
+  // Ensure every variant has an image
+  if (payload.variants && payload.variants.length > 0) {
+    for (let i = 0; i < payload.variants.length; i++) {
+      const v = payload.variants[i];
+      if (!v.image) {
+        if (finalImages[i]) {
+          v.image = finalImages[i];
+        } else if (finalImages[0]) {
+          v.image = finalImages[0];
+        } else {
+          throw new BadRequestError(
+            `Variant ${v.color || '#' + (i + 1)} must have an image.`,
+          );
+        }
+      }
+    }
+  }
+
   // Enforce enterprise brand
   const productData = {
     ...payload,
@@ -362,6 +380,26 @@ const updateProduct = async (
     }
 
     categoryVal = new Types.ObjectId(payload.category);
+  }
+
+  // Ensure every variant has an image if variants are updated
+  if (payload.variants && payload.variants.length > 0) {
+    for (let i = 0; i < payload.variants.length; i++) {
+      const v = payload.variants[i];
+      if (!v.image) {
+        if (finalImages[i]) {
+          v.image = finalImages[i];
+        } else if (finalImages[0]) {
+          v.image = finalImages[0];
+        } else if (existingProduct.images && existingProduct.images[0]) {
+          v.image = existingProduct.images[0];
+        } else {
+          throw new BadRequestError(
+            `Variant ${v.color || '#' + (i + 1)} must have an image.`,
+          );
+        }
+      }
+    }
   }
 
   // Apply payload to existing document and save to trigger pre-save hooks (auto discount, slug, variants)
