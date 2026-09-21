@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import asyncHandler from '../../../shared/asynchandler';
 import sendResponse from '../../../shared/sendResponse';
+import config from '../../../config';
+import jwtHelpers from '../../../helpers/jwtHelpers';
+import User from '../user/user.model';
 import { productService } from './product.service';
 
 // ── 1. Create Product (Admin) ────────────────────────────────────────────────
@@ -19,7 +22,28 @@ const createProduct = asyncHandler(async (req: Request, res: Response) => {
 
 // ── 2. Get All Products (Storefront / Public) ────────────────────────────────
 const getAllProducts = asyncHandler(async (req: Request, res: Response) => {
-  const result = await productService.getAllProducts(req.query, false);
+  let isAdmin =
+    req.user && (req.user.role === 'admin' || req.user.role === 'super-admin');
+
+  // If token is provided in header but req.user was not populated
+  if (!req.user && req.headers.authorization) {
+    try {
+      const token = req.headers.authorization.replace('Bearer ', '').trim();
+      if (token) {
+        const decoded = jwtHelpers.verifyToken(token, config.jwt_access_token_secret!) as any;
+        if (decoded?.id || decoded?._id) {
+          const user = await User.findById(decoded.id || decoded._id).select('-password');
+          if (user && (user.role === 'admin' || user.role === 'super-admin')) {
+            isAdmin = true;
+          }
+        }
+      }
+    } catch {
+      // Public storefront endpoint, ignore invalid token
+    }
+  }
+
+  const result = await productService.getAllProducts(req.query, !!isAdmin);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,

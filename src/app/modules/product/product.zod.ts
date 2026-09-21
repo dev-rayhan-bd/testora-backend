@@ -45,7 +45,7 @@ const createProductSchema = z
       .enum(['draft', 'active', 'hidden'], {
         message: 'Status must be draft, active, or hidden',
       })
-      .default('draft'),
+      .default('active'),
     category: z
       .string({ message: 'Product category is required' })
       .trim()
