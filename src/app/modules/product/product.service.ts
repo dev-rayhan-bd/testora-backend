@@ -99,18 +99,30 @@ const getAllProducts = async (
     }
   }
 
-  // Dynamic Price Filtering (minPrice / maxPrice)
-  const minPrice = query.minPrice !== undefined ? Number(query.minPrice) : undefined;
-  const maxPrice = query.maxPrice !== undefined ? Number(query.maxPrice) : undefined;
+  // Dynamic Price Filtering (minPrice / maxPrice) - checks base price and variant prices
+  const minPrice =
+    query.minPrice !== undefined && query.minPrice !== '' ? Number(query.minPrice) : undefined;
+  const maxPrice =
+    query.maxPrice !== undefined && query.maxPrice !== '' ? Number(query.maxPrice) : undefined;
 
   if (minPrice !== undefined || maxPrice !== undefined) {
-    filterConditions.price = {};
+    const priceCondition: Record<string, any> = {};
     if (minPrice !== undefined && !isNaN(minPrice)) {
-      filterConditions.price.$gte = minPrice;
+      priceCondition.$gte = minPrice;
     }
     if (maxPrice !== undefined && !isNaN(maxPrice)) {
-      filterConditions.price.$lte = maxPrice;
+      priceCondition.$lte = maxPrice;
     }
+
+    if (!filterConditions.$and) {
+      filterConditions.$and = [];
+    }
+    filterConditions.$and.push({
+      $or: [
+        { price: priceCondition },
+        { 'variants.price': priceCondition },
+      ],
+    });
   }
 
   // Stock status filter
@@ -129,10 +141,16 @@ const getAllProducts = async (
 
   // SKU exact filter
   if (query.sku) {
-    filterConditions.$or = [
-      { sku: (query.sku as string).toUpperCase() },
-      { 'variants.sku': (query.sku as string).toUpperCase() },
-    ];
+    const skuCode = (query.sku as string).toUpperCase();
+    if (!filterConditions.$and) {
+      filterConditions.$and = [];
+    }
+    filterConditions.$and.push({
+      $or: [
+        { sku: skuCode },
+        { 'variants.sku': skuCode },
+      ],
+    });
   }
 
   // Brand filter
@@ -157,6 +175,33 @@ const getAllProducts = async (
   delete cleanQuery.brand;
   if (!isAdmin) {
     delete cleanQuery.status;
+  }
+
+  // Normalize friendly sorting aliases
+  if (cleanQuery.sort) {
+    const sortVal = String(cleanQuery.sort).trim();
+    const sortMap: Record<string, string> = {
+      price_asc: 'price',
+      price_low_to_high: 'price',
+      low_to_high: 'price',
+      'price-asc': 'price',
+      price_desc: '-price',
+      price_high_to_low: '-price',
+      high_to_low: '-price',
+      'price-desc': '-price',
+      newest: '-createdAt',
+      latest: '-createdAt',
+      oldest: 'createdAt',
+      discount: '-discountPercentage',
+      top_deals: '-discountPercentage',
+      best_discount: '-discountPercentage',
+      'a-z': 'title',
+      name_asc: 'title',
+      'z-a': '-title',
+      name_desc: '-title',
+      stock: '-stock',
+    };
+    cleanQuery.sort = sortMap[sortVal.toLowerCase()] || sortVal;
   }
 
   // Initialize QueryBuilder

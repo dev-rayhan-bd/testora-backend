@@ -2883,62 +2883,58 @@
                       "description": "Items per page"
                     },
                     {
-                      "key": "status",
-                      "value": "active",
-                      "description": "Filter by workflow status (active, draft, hidden)"
-                    },
-                    {
-                      "key": "isLowStock",
-                      "value": "false",
-                      "description": "Show products below lowStockAlert threshold (true/false)"
-                    },
-                    {
-                      "key": "searchTerm",
-                      "value": "",
-                      "disabled": true,
-                      "description": "Full-text search in title, description, category, SKU"
-                    },
-                    {
-                      "key": "category",
-                      "value": "Study Materials",
-                      "disabled": true,
-                      "description": "Filter by product category"
-                    },
-                    {
                       "key": "minPrice",
                       "value": "10",
                       "disabled": true,
-                      "description": "Minimum price filter"
+                      "description": "Minimum price filter (e.g. 10)"
                     },
                     {
                       "key": "maxPrice",
                       "value": "100",
                       "disabled": true,
-                      "description": "Maximum price filter"
+                      "description": "Maximum price filter (e.g. 100)"
+                    },
+                    {
+                      "key": "category",
+                      "value": "Study Materials",
+                      "disabled": true,
+                      "description": "Filter by category name or ID"
+                    },
+                    {
+                      "key": "searchTerm",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Search keywords in title, description, category, SKU"
                     },
                     {
                       "key": "inStock",
                       "value": "true",
                       "disabled": true,
-                      "description": "Filter by stock availability (true/false)"
+                      "description": "Filter in-stock products only (true/false)"
                     },
                     {
                       "key": "hasDiscount",
                       "value": "true",
                       "disabled": true,
-                      "description": "Only show products currently on discount/sale"
-                    },
-                    {
-                      "key": "sku",
-                      "value": "",
-                      "disabled": true,
-                      "description": "Exact SKU lookup (supports parent and variant SKUs)"
+                      "description": "Filter products on discount/sale (true/false)"
                     },
                     {
                       "key": "sort",
                       "value": "-createdAt",
                       "disabled": true,
-                      "description": "Sort by field (-createdAt, price, -price, stock)"
+                      "description": "Sort options: newest, oldest, price_low_to_high (or price), price_high_to_low (or -price), discount (or -discountPercentage), a-z, z-a"
+                    },
+                    {
+                      "key": "status",
+                      "value": "active",
+                      "disabled": true,
+                      "description": "Workflow status filter: active, draft, hidden"
+                    },
+                    {
+                      "key": "isLowStock",
+                      "value": "false",
+                      "disabled": true,
+                      "description": "Filter products low on stock (true/false)"
                     }
                   ]
                 },
@@ -3441,38 +3437,26 @@
                     },
                     {
                       "key": "limit",
-                      "value": "10",
+                      "value": "20",
                       "description": "Items per page"
-                    },
-                    {
-                      "key": "category",
-                      "value": "Study Materials",
-                      "disabled": true,
-                      "description": "Filter by category"
                     },
                     {
                       "key": "minPrice",
                       "value": "10",
                       "disabled": true,
-                      "description": "Minimum price filter"
+                      "description": "Minimum price filter (e.g. 10)"
                     },
                     {
                       "key": "maxPrice",
                       "value": "100",
                       "disabled": true,
-                      "description": "Maximum price filter"
+                      "description": "Maximum price filter (e.g. 100)"
                     },
                     {
-                      "key": "inStock",
-                      "value": "true",
+                      "key": "category",
+                      "value": "Study Materials",
                       "disabled": true,
-                      "description": "Filter in-stock products only"
-                    },
-                    {
-                      "key": "hasDiscount",
-                      "value": "true",
-                      "disabled": true,
-                      "description": "Filter products on sale"
+                      "description": "Filter by category name or ID"
                     },
                     {
                       "key": "searchTerm",
@@ -3481,10 +3465,22 @@
                       "description": "Search keywords in title, description, category, SKU"
                     },
                     {
+                      "key": "inStock",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter in-stock products only (true/false)"
+                    },
+                    {
+                      "key": "hasDiscount",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Filter products on discount/sale (true/false)"
+                    },
+                    {
                       "key": "sort",
                       "value": "-createdAt",
                       "disabled": true,
-                      "description": "Sort by -createdAt, price, -price"
+                      "description": "Sort options: newest, oldest, price_low_to_high (or price), price_high_to_low (or -price), discount (or -discountPercentage), a-z, z-a"
                     }
                   ]
                 },

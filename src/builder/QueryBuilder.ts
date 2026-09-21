@@ -33,16 +33,9 @@ class QueryBuilder<T> {
     const sortField = this.query.sort as string;
 
     if (sortField) {
-      // Check if the sortField starts with '-' (indicating descending order)
-      const order = sortField.startsWith('-') ? -1 : 1;
-      const fieldName = sortField.replace('-', '');
-
-      // Dynamic sorting based on any field provided in the query
-      this.modelQuery = this.modelQuery.sort({
-        [fieldName]: order,
-      });
+      const sortBy = sortField.split(',').join(' ');
+      this.modelQuery = this.modelQuery.sort(sortBy);
     } else {
-      // Default sorting if no valid sort option is provided
       this.modelQuery = this.modelQuery.sort('-createdAt');
     }
 
