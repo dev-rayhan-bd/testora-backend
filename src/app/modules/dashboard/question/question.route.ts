@@ -172,6 +172,45 @@ dashboardQuestionRouter.delete(
 );
 
 dashboardQuestionRouter.post(
+  "/test-archive/:testId/restore",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.restoreTest
+);
+
+dashboardQuestionRouter.delete(
+  "/test-archive/:testId/permanent",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.permanentDeleteTest
+);
+
+dashboardQuestionRouter.post(
+  "/test-archive/bulk-permanent-delete",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkTestIdsSchema,
+  }),
+  dashboardQuestionController.bulkPermanentDeleteTests
+);
+
+dashboardQuestionRouter.post(
+  "/test-archive/bulk-restore",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkRestoreTestsSchema,
+  }),
+  dashboardQuestionController.bulkRestoreTests
+);
+
+dashboardQuestionRouter.post(
+  "/test-archive/bulk-archive",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkTestIdsSchema,
+  }),
+  dashboardQuestionController.bulkArchiveTests
+);
+
+dashboardQuestionRouter.post(
   "/test-archive/:testId/duplicate",
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   validateRequest({
@@ -246,6 +285,47 @@ dashboardQuestionRouter.patch(
     body: questionQueryValidationZodSchema.updateQuestionStatusSchema,
   }),
   dashboardQuestionController.updateQuestionStatus
+);
+
+// ── Bulk & Lifecycle Actions for Questions ───────────────────────────────────
+
+dashboardQuestionRouter.post(
+  "/bulk-permanent-delete",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkQuestionIdsSchema,
+  }),
+  dashboardQuestionController.bulkPermanentDeleteQuestions
+);
+
+dashboardQuestionRouter.post(
+  "/bulk-restore",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkRestoreQuestionsSchema,
+  }),
+  dashboardQuestionController.bulkRestoreQuestions
+);
+
+dashboardQuestionRouter.post(
+  "/bulk-archive",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: questionQueryValidationZodSchema.bulkQuestionIdsSchema,
+  }),
+  dashboardQuestionController.bulkArchiveQuestions
+);
+
+dashboardQuestionRouter.post(
+  "/:questionId/restore",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.restoreQuestion
+);
+
+dashboardQuestionRouter.delete(
+  "/:questionId/permanent",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.permanentDeleteQuestion
 );
 
 dashboardQuestionRouter.delete(

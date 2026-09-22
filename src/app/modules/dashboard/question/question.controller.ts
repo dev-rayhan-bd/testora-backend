@@ -143,11 +143,70 @@ const updateQuestionStatus = asyncHandler(async (req: Request, res: Response) =>
 });
 
 const deleteQuestion = asyncHandler(async (req: Request, res: Response) => {
-    const result = await dashboardQuestionService.deleteQuestion(req.params.questionId as string);
+    const isPermanent = req.query.permanent === "true";
+    const result = isPermanent
+        ? await dashboardQuestionService.permanentDeleteQuestion(req.params.questionId as string)
+        : await dashboardQuestionService.deleteQuestion(req.params.questionId as string);
     sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
-        message: "Question deleted successfully.",
+        message: result.message,
+        data: result,
+    });
+});
+
+const restoreQuestion = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.restoreQuestion(
+        req.params.questionId as string,
+        req.body?.targetStatus || "published"
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result.data,
+    });
+});
+
+const permanentDeleteQuestion = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.permanentDeleteQuestion(req.params.questionId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkPermanentDeleteQuestions = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkPermanentDeleteQuestions(req.body.questionIds);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkRestoreQuestions = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkRestoreQuestions(
+        req.body.questionIds,
+        req.body?.targetStatus || "published"
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkArchiveQuestions = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkArchiveQuestions(req.body.questionIds);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
         data: result,
     });
 });
@@ -238,11 +297,70 @@ const updateTestStatus = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const deleteTest = asyncHandler(async (req: Request, res: Response) => {
-    const result = await dashboardQuestionService.deleteTest(req.params.testId as string);
+    const isPermanent = req.query.permanent === "true";
+    const result = isPermanent
+        ? await dashboardQuestionService.permanentDeleteTest(req.params.testId as string)
+        : await dashboardQuestionService.deleteTest(req.params.testId as string);
     sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
-        message: "Test deleted successfully.",
+        message: result.message,
+        data: result,
+    });
+});
+
+const restoreTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.restoreTest(
+        req.params.testId as string,
+        req.body?.targetStatus || "published"
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result.data,
+    });
+});
+
+const permanentDeleteTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.permanentDeleteTest(req.params.testId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkPermanentDeleteTests = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkPermanentDeleteTests(req.body.testIds);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkRestoreTests = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkRestoreTests(
+        req.body.testIds,
+        req.body?.targetStatus || "published"
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+const bulkArchiveTests = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.bulkArchiveTests(req.body.testIds);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
         data: result,
     });
 });
@@ -290,12 +408,22 @@ export const dashboardQuestionController = {
     updateQuestion,
     updateQuestionStatus,
     deleteQuestion,
+    restoreQuestion,
+    permanentDeleteQuestion,
+    bulkPermanentDeleteQuestions,
+    bulkRestoreQuestions,
+    bulkArchiveQuestions,
     getAllTestArchiveIntoDashboard,
     createTest,
     getTestById,
     updateTest,
     updateTestStatus,
     deleteTest,
+    restoreTest,
+    permanentDeleteTest,
+    bulkPermanentDeleteTests,
+    bulkRestoreTests,
+    bulkArchiveTests,
     duplicateTest,
     copyYearQuestions,
     createPassage,

@@ -50,9 +50,7 @@ const getAllQuestions = async (input: TQuestionListInput) => {
     const limit = Number(input.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const matchQuery: Record<string, unknown> = {
-        isActive: true,
-    };
+    const matchQuery: Record<string, unknown> = {};
 
     // ── questionText search আলাদা field হিসেবে রাখো ──
     if (input.questionText?.trim()) {
@@ -67,7 +65,17 @@ const getAllQuestions = async (input: TQuestionListInput) => {
     if (input.year) matchQuery.year = Number(input.year);
     if (input.access) matchQuery.access = input.access;
     if (input.difficultyLevel) matchQuery.difficultyLevel = input.difficultyLevel;
-    if (input.status) matchQuery.status = input.status;
+
+    // Status filtering: "archived" fetches only archived, "published"/"draft"/"hidden" fetches those, undefined fetches non-archived
+    if (input.status === "archived") {
+        matchQuery.status = "archived";
+    } else if (input.status) {
+        matchQuery.status = input.status;
+        matchQuery.isActive = true;
+    } else {
+        matchQuery.status = { $ne: "archived" };
+        matchQuery.isActive = true;
+    }
 
     if (input.passageId && mongoose.isValidObjectId(input.passageId)) {
         matchQuery.passage = new Schema.Types.ObjectId(input.passageId);
@@ -521,15 +529,23 @@ const getAllTestArchive = async (input: TTestListInput) => {
     const limit = Number(input.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const matchQuery: Record<string, unknown> = {
-        isActive: true,
-    };
+    const matchQuery: Record<string, unknown> = {};
 
     if (input.examType) matchQuery.examType = input.examType;
     if (input.year) matchQuery.year = Number(input.year);
     if (input.access) matchQuery.access = input.access;
-    if (input.status) matchQuery.status = input.status;
     if (input.testType) matchQuery.testType = input.testType;
+
+    // Status filtering: "archived" fetches only archived, "published"/"draft"/"hidden" fetches those, undefined fetches non-archived
+    if (input.status === "archived") {
+        matchQuery.status = "archived";
+    } else if (input.status) {
+        matchQuery.status = input.status;
+        matchQuery.isActive = true;
+    } else {
+        matchQuery.status = { $ne: "archived" };
+        matchQuery.isActive = true;
+    }
 
     // ── searchTerm → title, testCode, subject, faculty, department ──
     if (input.searchTerm?.trim()) {
@@ -1009,6 +1025,43 @@ const deleteQuestion = async (questionId: string) => {
         throw new NotFoundError("Question not found");
     }
 
+    // Move to Archive (Soft delete)
+    await Question.findByIdAndUpdate(
+        questionId,
+        {
+            status: "archived",
+            isActive: false,
+        },
+        { runValidators: false }
+    );
+
+    return { message: "Question moved to archive successfully" };
+};
+
+const restoreQuestion = async (questionId: string, targetStatus: string = "published") => {
+    const question = await Question.findById(questionId);
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
+    const updated = await Question.findByIdAndUpdate(
+        questionId,
+        {
+            status: targetStatus,
+            isActive: true,
+        },
+        { new: true, runValidators: false }
+    );
+
+    return { message: "Question restored successfully", data: updated };
+};
+
+const permanentDeleteQuestion = async (questionId: string) => {
+    const question = await Question.findById(questionId);
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
     // Decrement test counts if attached
     if (question.testIds && question.testIds.length > 0) {
         await Test.updateMany(
@@ -1019,7 +1072,65 @@ const deleteQuestion = async (questionId: string) => {
 
     await Question.findByIdAndDelete(questionId);
 
-    return { message: "Question deleted successfully" };
+    return { message: "Question permanently deleted successfully" };
+};
+
+const bulkPermanentDeleteQuestions = async (questionIds: string[]) => {
+    if (!questionIds || questionIds.length === 0) {
+        throw new BadRequestError("No question IDs provided");
+    }
+
+    const questions = await Question.find({ _id: { $in: questionIds } }).select("testIds").lean();
+    const testCounts: Record<string, number> = {};
+    questions.forEach(q => {
+        (q.testIds || []).forEach((tId: any) => {
+            const str = tId.toString();
+            testCounts[str] = (testCounts[str] || 0) + 1;
+        });
+    });
+
+    for (const [testId, count] of Object.entries(testCounts)) {
+        await Test.findByIdAndUpdate(testId, { $inc: { totalQuestions: -count } });
+    }
+
+    const result = await Question.deleteMany({ _id: { $in: questionIds } });
+
+    return {
+        message: `Successfully permanently deleted ${result.deletedCount} questions`,
+        deletedCount: result.deletedCount,
+    };
+};
+
+const bulkRestoreQuestions = async (questionIds: string[], targetStatus: string = "published") => {
+    if (!questionIds || questionIds.length === 0) {
+        throw new BadRequestError("No question IDs provided");
+    }
+
+    const result = await Question.updateMany(
+        { _id: { $in: questionIds } },
+        { status: targetStatus, isActive: true }
+    );
+
+    return {
+        message: `Successfully restored ${result.modifiedCount} questions`,
+        modifiedCount: result.modifiedCount,
+    };
+};
+
+const bulkArchiveQuestions = async (questionIds: string[]) => {
+    if (!questionIds || questionIds.length === 0) {
+        throw new BadRequestError("No question IDs provided");
+    }
+
+    const result = await Question.updateMany(
+        { _id: { $in: questionIds } },
+        { status: "archived", isActive: false }
+    );
+
+    return {
+        message: `Successfully archived ${result.modifiedCount} questions`,
+        modifiedCount: result.modifiedCount,
+    };
 };
 
 // ── Passage Management ───────────────────────────────────────────────────────
@@ -1222,12 +1333,95 @@ const deleteTest = async (testId: string) => {
         throw new NotFoundError("Test not found");
     }
 
+    // Move to Archive (Soft delete)
+    await Test.findByIdAndUpdate(
+        testId,
+        {
+            status: "archived",
+            isActive: false,
+        },
+        { runValidators: false }
+    );
+
+    return { message: "Test moved to archive successfully" };
+};
+
+const restoreTest = async (testId: string, targetStatus: string = "published") => {
+    const test = await Test.findById(testId);
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
+    const updated = await Test.findByIdAndUpdate(
+        testId,
+        {
+            status: targetStatus,
+            isActive: true,
+        },
+        { new: true, runValidators: false }
+    );
+
+    return { message: "Test restored successfully", data: updated };
+};
+
+const permanentDeleteTest = async (testId: string) => {
+    const test = await Test.findById(testId);
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
     // Remove test link from questions
     await Question.updateMany({ testIds: testId }, { $pull: { testIds: testId } });
 
     await Test.findByIdAndDelete(testId);
 
-    return { message: "Test removed successfully" };
+    return { message: "Test permanently deleted successfully" };
+};
+
+const bulkPermanentDeleteTests = async (testIds: string[]) => {
+    if (!testIds || testIds.length === 0) {
+        throw new BadRequestError("No test IDs provided");
+    }
+
+    await Question.updateMany({ testIds: { $in: testIds } }, { $pull: { testIds: { $in: testIds } } });
+    const result = await Test.deleteMany({ _id: { $in: testIds } });
+
+    return {
+        message: `Successfully permanently deleted ${result.deletedCount} tests`,
+        deletedCount: result.deletedCount,
+    };
+};
+
+const bulkRestoreTests = async (testIds: string[], targetStatus: string = "published") => {
+    if (!testIds || testIds.length === 0) {
+        throw new BadRequestError("No test IDs provided");
+    }
+
+    const result = await Test.updateMany(
+        { _id: { $in: testIds } },
+        { status: targetStatus, isActive: true }
+    );
+
+    return {
+        message: `Successfully restored ${result.modifiedCount} tests`,
+        modifiedCount: result.modifiedCount,
+    };
+};
+
+const bulkArchiveTests = async (testIds: string[]) => {
+    if (!testIds || testIds.length === 0) {
+        throw new BadRequestError("No test IDs provided");
+    }
+
+    const result = await Test.updateMany(
+        { _id: { $in: testIds } },
+        { status: "archived", isActive: false }
+    );
+
+    return {
+        message: `Successfully archived ${result.modifiedCount} tests`,
+        modifiedCount: result.modifiedCount,
+    };
 };
 
 const duplicateTest = async (
@@ -1364,12 +1558,22 @@ export const dashboardQuestionService = {
     updateQuestion,
     updateQuestionStatus,
     deleteQuestion,
+    restoreQuestion,
+    permanentDeleteQuestion,
+    bulkPermanentDeleteQuestions,
+    bulkRestoreQuestions,
+    bulkArchiveQuestions,
     getAllTestArchive,
     createTest,
     getTestById,
     updateTest,
     updateTestStatus,
     deleteTest,
+    restoreTest,
+    permanentDeleteTest,
+    bulkPermanentDeleteTests,
+    bulkRestoreTests,
+    bulkArchiveTests,
     duplicateTest,
     copyYearQuestions,
     createPassage,

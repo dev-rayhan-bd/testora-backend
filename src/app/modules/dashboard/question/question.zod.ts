@@ -160,8 +160,8 @@ export const testListValidation = z.object({
     .optional(),
 
   status: z
-    .enum(["published", "draft"], {
-      message: "Status must be published or draft",
+    .enum(["published", "draft", "hidden", "archived"], {
+      message: "Status must be published, draft, hidden or archived",
     })
     .optional(),
 });
@@ -304,6 +304,32 @@ export const copyYearSchema = z.object({
   targetTestId: z.string({ message: "Target test ID is required" }),
 });
 
+export const bulkQuestionIdsSchema = z.object({
+  questionIds: z.array(z.string().min(1, { message: "Question ID cannot be empty" })).min(1, {
+    message: "At least one question ID is required",
+  }),
+});
+
+export const bulkRestoreQuestionsSchema = z.object({
+  questionIds: z.array(z.string().min(1, { message: "Question ID cannot be empty" })).min(1, {
+    message: "At least one question ID is required",
+  }),
+  targetStatus: z.enum(["published", "draft"]).optional().default("published"),
+});
+
+export const bulkTestIdsSchema = z.object({
+  testIds: z.array(z.string().min(1, { message: "Test ID cannot be empty" })).min(1, {
+    message: "At least one test ID is required",
+  }),
+});
+
+export const bulkRestoreTestsSchema = z.object({
+  testIds: z.array(z.string().min(1, { message: "Test ID cannot be empty" })).min(1, {
+    message: "At least one test ID is required",
+  }),
+  targetStatus: z.enum(["published", "draft"]).optional().default("published"),
+});
+
 export type TCreatePassagePayload = z.infer<typeof passageSchema>;
 export type TUpdatePassagePayload = z.infer<typeof updatePassageSchema>;
 export type TQuestionListInput = z.infer<typeof questionListValidation>;
@@ -326,6 +352,10 @@ const questionQueryValidationZodSchema = {
   updateTestStatusSchema,
   duplicateTestSchema,
   copyYearSchema,
+  bulkQuestionIdsSchema,
+  bulkRestoreQuestionsSchema,
+  bulkTestIdsSchema,
+  bulkRestoreTestsSchema,
 };
 
 export default questionQueryValidationZodSchema;
