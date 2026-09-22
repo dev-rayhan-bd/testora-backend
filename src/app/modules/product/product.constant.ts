@@ -9,8 +9,8 @@ export const PRODUCT_BRAND = 'Testora' as const;
 export const PRODUCT_SEARCHABLE_FIELDS = [
   'title',
   'description',
-  'category',
   'slug',
+  'sku',
 ];
 
 export const PRODUCT_FILTERABLE_FIELDS = [

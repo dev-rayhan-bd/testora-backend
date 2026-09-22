@@ -224,8 +224,40 @@ const getAllProducts = async (
     filterConditions.$expr = { $lte: ['$stock', '$lowStockAlert'] };
   }
 
+  // Handle robust multi-field search including category and variants
+  if (query.searchTerm && typeof query.searchTerm === 'string') {
+    const term = query.searchTerm.trim();
+    if (term) {
+      const matchingCategories = await Category.find({
+        name: { $regex: term, $options: 'i' },
+        isDeleted: false,
+      }).select('_id');
+
+      const catIds = matchingCategories.map((c) => c._id);
+      if (!filterConditions.$and) {
+        filterConditions.$and = [];
+      }
+
+      const searchOr: any[] = [
+        { title: { $regex: term, $options: 'i' } },
+        { description: { $regex: term, $options: 'i' } },
+        { slug: { $regex: term, $options: 'i' } },
+        { sku: { $regex: term, $options: 'i' } },
+        { 'variants.sku': { $regex: term, $options: 'i' } },
+        { 'variants.color': { $regex: term, $options: 'i' } },
+      ];
+
+      if (catIds.length > 0) {
+        searchOr.push({ category: { $in: catIds } });
+      }
+
+      filterConditions.$and.push({ $or: searchOr });
+    }
+  }
+
   // Exclude custom query keys from QueryBuilder raw filter
   const cleanQuery = { ...query };
+  delete cleanQuery.searchTerm;
   delete cleanQuery.minPrice;
   delete cleanQuery.maxPrice;
   delete cleanQuery.inStock;
