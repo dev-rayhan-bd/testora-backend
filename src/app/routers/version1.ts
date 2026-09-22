@@ -17,11 +17,19 @@ import orderRouter from '../modules/order/order.route';
 import couponRouter from '../modules/coupon/coupon.route';
 import shippingRouter from '../modules/shipping/shipping.route';
 import categoryRouter from '../modules/category/category.route';
-
+import subscriptionRouter from '../modules/subscription/subscription.routes';
 
 const routersVersionOne = express.Router();
 
 const appRouters = [
+  {
+    path: '/subscription',
+    router: subscriptionRouter,
+  },
+  {
+    path: '/subscriptions',
+    router: subscriptionRouter,
+  },
   {
     path: '/user',
     router: userRouter,

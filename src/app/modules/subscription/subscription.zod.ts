@@ -1,75 +1,68 @@
-// import z from "zod";
-// import { SUBSCRIPTION_MODE, SUBSCRIPTION_PLAN, SUBSCRIPTION_STATUS } from "./subscription.constant";
+import { z } from "zod";
+import { SUBSCRIPTION_PLAN_TYPE, SUBSCRIPTION_STATUS } from "./subscription.constant";
 
+const inAppPurchaseSchema = z.object({
+  product: z
+    .string({ message: "Product name is required" })
+    .trim()
+    .min(1, { message: "Product name cannot be empty" }),
+  planType: z.enum(
+    [
+      SUBSCRIPTION_PLAN_TYPE.MONTHLY,
+      SUBSCRIPTION_PLAN_TYPE.YEARLY,
+      SUBSCRIPTION_PLAN_TYPE.ONE_TIME,
+    ],
+    {
+      message: "Plan type must be monthly, yearly, or one-time",
+    }
+  ),
+  paymentProvider: z.string().trim().optional(),
+  payment: z.string().trim().optional(),
+  orderId: z
+    .string({ message: "Order ID / Transaction ID is required" })
+    .trim()
+    .min(1, { message: "Order ID cannot be empty" }),
+  purchaseToken: z.string().trim().optional(),
+  price: z.coerce.number().min(0).optional().default(0),
+  currency: z.string().trim().optional().default("EUR"),
+  startDate: z.string().optional(),
+  expiryDate: z.string().optional(),
+});
 
+const updateSubscriptionStatusSchema = z.object({
+  status: z.enum(
+    [
+      SUBSCRIPTION_STATUS.ACTIVE,
+      SUBSCRIPTION_STATUS.EXPIRED,
+      SUBSCRIPTION_STATUS.CANCELLED,
+    ],
+    {
+      message: "Status must be active, expired, or cancelled",
+    }
+  ),
+  cancellationReason: z.string().trim().optional(),
+  extensionDays: z.coerce.number().int().min(1).optional(),
+});
 
-// const subscriptionRequestPayload = z.object({
-//   plan: z.enum(Object.values(SUBSCRIPTION_PLAN), {
-//     error: (issue) => {
-//       if (issue.input === undefined) return 'subscription plan is required';
-//       if (typeof issue.input !== 'string') return 'subscription plan must be a string';
-//       return 'subscription plan must be one of the predefined values';
-//     }
-//   }),
-//   mode: z.enum(Object.values(SUBSCRIPTION_MODE), {
-//     error: (issue) => {
-//       if (issue.input === undefined) return 'subscription mode is required';
-//       if (typeof issue.input !== 'string') return 'subscription mode must be a string';
-//       return 'subscription mode must be one of the predefined values';
-//     }
-//   }),
+const getSubscriptionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  searchTerm: z.string().trim().optional(),
+  product: z.string().trim().optional(),
+  planType: z.string().trim().optional(),
+  status: z.string().trim().optional(),
+  expiring: z.string().trim().optional(),
+});
 
-//   price: z.coerce.number().nonnegative()
-// });
+export type TInAppPurchasePayload = z.infer<typeof inAppPurchaseSchema>;
+export type TUpdateSubscriptionStatusPayload = z.infer<
+  typeof updateSubscriptionStatusSchema
+>;
 
+const subscriptionZodSchema = {
+  inAppPurchaseSchema,
+  updateSubscriptionStatusSchema,
+  getSubscriptionsQuerySchema,
+};
 
-// const updateSubscriptionSchema = z.object({
-//   plan: z.enum(Object.values(SUBSCRIPTION_PLAN) as [string, ...string[]], {
-//     error: () => 'Invalid subscription plan',
-//   }),
-//   billingCycle: z.enum(Object.values(SUBSCRIPTION_MODE) as [string, ...string[]], {
-//     error: () => 'Invalid billing cycle',
-//   }).nullable(),
-
-//   price: z.coerce.number().nonnegative(),
-//   activatedAt: z.preprocess(
-//     (val) => (val === null || val === undefined || val === '' ? null : new Date(val as string)),
-//     z.date().nullable().optional()
-//   ),
-//   expiryDate: z.preprocess(
-//     (val) => (val === null || val === undefined || val === '' ? null : new Date(val as string)),
-//     z.date().nullable().optional()
-//   ),
-//   status: z.enum(Object.values(SUBSCRIPTION_STATUS) as [string, ...string[]]).optional(),
-// }).superRefine((data, ctx) => {
-//   if (data.plan === SUBSCRIPTION_PLAN.FREE) {
-//     if (data.price !== 0) {
-//       ctx.addIssue({
-//         code: 'custom',
-//         path: ['price'],
-//         message: 'Price must be 0 for free plan',
-//       });
-//     }
-//   } else {
-//     if (data.billingCycle === null) {
-//       ctx.addIssue({
-//         code: 'custom',
-//         path: ['billingCycle'],
-//         message: 'Billing cycle is required for non-free plans',
-//       });
-//     }
-//   }
-// });
-
-
-// export type TUpdateSubscriptionPayload = z.infer<typeof updateSubscriptionSchema>;
-
-// export type TSubscriptionRequestPayload = z.infer<
-//   typeof subscriptionRequestPayload
-// >;
-// const subsCriptionValidationZodSchema = {
-//   subscriptionRequestPayload,
-//   updateSubscriptionSchema
-// };
-
-// export default subsCriptionValidationZodSchema;
+export default subscriptionZodSchema;

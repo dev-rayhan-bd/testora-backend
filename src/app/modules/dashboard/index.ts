@@ -11,14 +11,15 @@ import orderRouter from "../order/order.route";
 import couponRouter from "../coupon/coupon.route";
 import shippingRouter from "../shipping/shipping.route";
 import categoryRouter from "../category/category.route";
-
+import subscriptionRouter from "../subscription/subscription.routes";
 
 const adminRouter = Router();
-
 
 adminRouter.use('/questions', dashboardQuestionRouter);
 adminRouter.use('/users', userManagementRouter);
 adminRouter.use('/overview', userOverviewRouter);
+adminRouter.use('/subscriptions', subscriptionRouter);
+adminRouter.use('/premium-users', subscriptionRouter);
 adminRouter.use('/blog', blogRouter);
 adminRouter.use('/products', productRouter);
 adminRouter.use('/orders', orderRouter);

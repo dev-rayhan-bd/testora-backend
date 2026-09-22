@@ -1,21 +1,28 @@
-// import { Types } from "mongoose";
-// import { TSubscriptionMode, TSubscriptionPlan, TSubscriptionStatus } from "../user/user.constant";
-
 import { Types } from "mongoose";
-import { TSubscriptionMode, TSubscriptionPlan, TSubscriptionStatus } from "./subscription.constant";
-
+import {
+    TSubscriptionMode,
+    TSubscriptionPlan,
+    TSubscriptionPlanType,
+    TSubscriptionStatus,
+} from "./subscription.constant";
 
 export interface ISubscription {
-    // Active
     user: Types.ObjectId;
-    plan: TSubscriptionPlan | null;
-    billingCycle: TSubscriptionMode | null;
+    product: string;
+    plan?: TSubscriptionPlan | null;
+    planType: TSubscriptionPlanType;
+    billingCycle?: TSubscriptionMode | null;
     status: TSubscriptionStatus;
     price: number;
-    activatedAt: Date | null;
-    expiryDate: Date | null;
-
+    currency: string;
+    payment: string;
+    orderId: string;
+    purchaseToken?: string | null;
+    startDate: Date;
+    activatedAt?: Date | null;
+    expiryDate: Date;
+    cancelledAt?: Date | null;
+    cancellationReason?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
-
-
-
