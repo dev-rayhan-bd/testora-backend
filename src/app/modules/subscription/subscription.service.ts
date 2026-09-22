@@ -400,6 +400,11 @@ const updateSubscriptionStatus = async (
     sub.status = SUBSCRIPTION_STATUS.ACTIVE;
   }
 
+  if (payload.expiryDate) {
+    sub.expiryDate = new Date(payload.expiryDate);
+    sub.status = SUBSCRIPTION_STATUS.ACTIVE;
+  }
+
   await sub.save();
   return sub;
 };

@@ -29,20 +29,31 @@ const inAppPurchaseSchema = z.object({
   expiryDate: z.string().optional(),
 });
 
-const updateSubscriptionStatusSchema = z.object({
-  status: z.enum(
-    [
-      SUBSCRIPTION_STATUS.ACTIVE,
-      SUBSCRIPTION_STATUS.EXPIRED,
-      SUBSCRIPTION_STATUS.CANCELLED,
-    ],
+const updateSubscriptionStatusSchema = z
+  .object({
+    status: z
+      .enum(
+        [
+          SUBSCRIPTION_STATUS.ACTIVE,
+          SUBSCRIPTION_STATUS.EXPIRED,
+          SUBSCRIPTION_STATUS.CANCELLED,
+        ],
+        {
+          message: "Status must be active, expired, or cancelled",
+        }
+      )
+      .optional(),
+    cancellationReason: z.string().trim().optional(),
+    extensionDays: z.coerce.number().int().min(1).optional(),
+    expiryDate: z.string().optional(),
+  })
+  .refine(
+    (data) => data.status || data.extensionDays || data.expiryDate,
     {
-      message: "Status must be active, expired, or cancelled",
+      message:
+        "At least one of 'status', 'extensionDays', or 'expiryDate' must be provided",
     }
-  ),
-  cancellationReason: z.string().trim().optional(),
-  extensionDays: z.coerce.number().int().min(1).optional(),
-});
+  );
 
 const getSubscriptionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
