@@ -992,15 +992,15 @@ const updateQuestionStatus = async (questionId: string, status: string) => {
         throw new NotFoundError("Question not found");
     }
 
-    question.status = status as any;
-    if (status === "archived") {
-        question.isActive = false;
-    } else {
-        question.isActive = true;
-    }
-
-    await question.save();
-    return question;
+    const updated = await Question.findByIdAndUpdate(
+        questionId,
+        {
+            status,
+            isActive: status !== "archived",
+        },
+        { new: true, runValidators: false }
+    );
+    return updated;
 };
 
 const deleteQuestion = async (questionId: string) => {
@@ -1009,11 +1009,6 @@ const deleteQuestion = async (questionId: string) => {
         throw new NotFoundError("Question not found");
     }
 
-    // Soft delete
-    question.isActive = false;
-    question.status = "archived" as any;
-    await question.save();
-
     // Decrement test counts if attached
     if (question.testIds && question.testIds.length > 0) {
         await Test.updateMany(
@@ -1021,6 +1016,8 @@ const deleteQuestion = async (questionId: string) => {
             { $inc: { totalQuestions: -1 } }
         );
     }
+
+    await Question.findByIdAndDelete(questionId);
 
     return { message: "Question deleted successfully" };
 };
@@ -1092,8 +1089,7 @@ const deletePassage = async (passageId: string) => {
         throw new NotFoundError("Passage not found");
     }
 
-    passage.isActive = false;
-    await passage.save();
+    await Passage.findByIdAndDelete(passageId);
 
     return { message: "Passage removed successfully" };
 };
@@ -1209,9 +1205,15 @@ const updateTestStatus = async (testId: string, status: string) => {
         throw new NotFoundError("Test not found");
     }
 
-    test.status = status as any;
-    await test.save();
-    return test;
+    const updated = await Test.findByIdAndUpdate(
+        testId,
+        {
+            status,
+            isActive: status !== "archived",
+        },
+        { new: true, runValidators: false }
+    );
+    return updated;
 };
 
 const deleteTest = async (testId: string) => {
@@ -1220,12 +1222,10 @@ const deleteTest = async (testId: string) => {
         throw new NotFoundError("Test not found");
     }
 
-    test.isActive = false;
-    test.status = "archived" as any;
-    await test.save();
-
     // Remove test link from questions
     await Question.updateMany({ testIds: testId }, { $pull: { testIds: testId } });
+
+    await Test.findByIdAndDelete(testId);
 
     return { message: "Test removed successfully" };
 };

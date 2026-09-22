@@ -103,6 +103,12 @@ dashboardQuestionRouter.delete(
   dashboardQuestionController.deletePassage
 );
 
+dashboardQuestionRouter.delete(
+  "/passages/:passageId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deletePassage
+);
+
 // ── 3. Test Archive Management (Must come before /:questionId routes) ────────
 
 dashboardQuestionRouter.get(
@@ -149,6 +155,18 @@ dashboardQuestionRouter.patch(
 
 dashboardQuestionRouter.delete(
   "/test-archive/:testId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deleteTest
+);
+
+dashboardQuestionRouter.delete(
+  "/tests/:testId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deleteTest
+);
+
+dashboardQuestionRouter.delete(
+  "/test/:testId",
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   dashboardQuestionController.deleteTest
 );
@@ -232,6 +250,24 @@ dashboardQuestionRouter.patch(
 
 dashboardQuestionRouter.delete(
   "/:questionId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deleteQuestion
+);
+
+dashboardQuestionRouter.delete(
+  "/question/:questionId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deleteQuestion
+);
+
+dashboardQuestionRouter.delete(
+  "/questions/:questionId",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  dashboardQuestionController.deleteQuestion
+);
+
+dashboardQuestionRouter.delete(
+  "/delete/:questionId",
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   dashboardQuestionController.deleteQuestion
 );
