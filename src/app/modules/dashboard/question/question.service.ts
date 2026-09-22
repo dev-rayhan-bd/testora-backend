@@ -1221,6 +1221,7 @@ const deleteTest = async (testId: string) => {
     }
 
     test.isActive = false;
+    test.status = "archived" as any;
     await test.save();
 
     // Remove test link from questions
