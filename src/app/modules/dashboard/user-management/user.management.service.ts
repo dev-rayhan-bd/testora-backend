@@ -67,8 +67,10 @@ const getAllUsers = async (query: Record<string, unknown>) => {
             });
         } else if (cleanPlan === 'matura') {
             andConditions.push({ plan: { $regex: /^matura$/i } });
-        } else if (cleanPlan === 'provime') {
-            andConditions.push({ plan: { $regex: /^provime$/i } });
+        } else if (cleanPlan === 'provime' || cleanPlan === 'entrance' || cleanPlan === 'entrance exam') {
+            andConditions.push({ plan: { $regex: /^(provime|entrance)/i } });
+        } else if (cleanPlan === 'full access' || cleanPlan === 'full-access' || cleanPlan === 'full_access') {
+            andConditions.push({ plan: { $regex: /^full[ -_]?access/i } });
         } else {
             andConditions.push({ plan: { $regex: new RegExp(`^${plan.trim()}$`, 'i') } });
         }
@@ -130,9 +132,32 @@ const getAllUsers = async (query: Record<string, unknown>) => {
                                         },
                                         {
                                             case: {
-                                                $in: ['$plan', ['provime', 'Provime']],
+                                                $in: [
+                                                    '$plan',
+                                                    [
+                                                        'provime',
+                                                        'Provime',
+                                                        'entrance exam',
+                                                        'Entrance Exam',
+                                                        'Entrance Exam Package',
+                                                    ],
+                                                ],
                                             },
                                             then: 'Provime',
+                                        },
+                                        {
+                                            case: {
+                                                $in: [
+                                                    '$plan',
+                                                    [
+                                                        'full-access',
+                                                        'full_access',
+                                                        'Full Access',
+                                                        'Full Access Package',
+                                                    ],
+                                                ],
+                                            },
+                                            then: 'Full Access',
                                         },
                                     ],
                                     default: { $ifNull: ['$plan', 'Free'] },

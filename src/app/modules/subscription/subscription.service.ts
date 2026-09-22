@@ -18,15 +18,10 @@ import {
 // Helper to map product title to internal plan enum if matching
 const mapProductToPlan = (productName: string): TSubscriptionPlan | null => {
   const p = productName.toLowerCase();
+  if (p.includes("full")) return SUBSCRIPTION_PLAN.FULL_ACCESS;
   if (p.includes("semi")) return SUBSCRIPTION_PLAN.SEMI_MATURA;
   if (p.includes("matura")) return SUBSCRIPTION_PLAN.MATURA;
-  if (
-    p.includes("entrance") ||
-    p.includes("provime") ||
-    p.includes("medicine") ||
-    p.includes("law") ||
-    p.includes("economics")
-  ) {
+  if (p.includes("entrance") || p.includes("provime")) {
     return SUBSCRIPTION_PLAN.PROVIME;
   }
   return null;
