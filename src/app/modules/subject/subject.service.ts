@@ -12,7 +12,9 @@ import { TGetSubjectQueryPayload } from "./subject.zod";
 import { IUser } from "../user/user.interface";
 
 
-const createSubject = async (payload: ISubject) => {
+import Question from "../question/question.model";
+
+const createSubject = async (payload: any) => {
     const isExist = await Subject.findOne({
         name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
         examType: payload.examType,
@@ -27,35 +29,86 @@ const createSubject = async (payload: ISubject) => {
 
     const subjectData = {
         ...payload,
+        nameInEnglish: payload.nameInEnglish || payload.name,
+        nameInAlbanian: payload.nameInAlbanian || payload.name,
         slug: generatedSlug,
     };
 
     const result = await Subject.create(subjectData);
-    return {
-        subjects: result._id,
-        name: result.name,
-        slug: result.slug,
-        examType: result.examType
-    };
+    return result;
 };
 
 
-const getAllSubjects = async (query: TGetSubjectQueryPayload) => {
+const getAllSubjects = async (query?: any) => {
     const filter: Record<string, unknown> = { isActive: true };
 
-    if (query?.examType) {
+    if (query?.examType && query.examType !== "all") {
         filter.examType = query.examType;
+    }
+    if (query?.searchTerm?.trim()) {
+        filter.name = { $regex: query.searchTerm.trim(), $options: "i" };
     }
 
     const result = await Subject.find(filter).sort({ createdAt: -1 });
 
-    const formattedResult = result.map(subject => ({
-        subjects: subject._id,
-        name: subject.name,
-        slug: subject.slug,
-    }));
+    const formattedResult = await Promise.all(
+        result.map(async (subject) => {
+            const questionCount = await Question.countDocuments({
+                subject: subject._id,
+                isActive: true,
+            });
+            return {
+                _id: subject._id,
+                name: subject.name,
+                nameInEnglish: subject.nameInEnglish,
+                nameInAlbanian: subject.nameInAlbanian,
+                slug: subject.slug,
+                examType: subject.examType,
+                isElective: subject.isElective,
+                isActive: subject.isActive,
+                questionCount,
+                createdAt: subject.createdAt,
+            };
+        })
+    );
 
     return formattedResult;
+};
+
+const updateSubject = async (id: string, payload: any) => {
+    const subject = await Subject.findById(id);
+    if (!subject) {
+        throw new BadRequestError("Subject not found");
+    }
+
+    if (payload.name && payload.name !== subject.name) {
+        const isExist = await Subject.findOne({
+            name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+            examType: payload.examType || subject.examType,
+            _id: { $ne: id },
+        });
+        if (isExist) {
+            throw new BadRequestError(`Subject name "${payload.name}" already exists!`);
+        }
+        payload.slug = slugify(payload.name, { lower: true, strict: true });
+    }
+
+    const updated = await Subject.findByIdAndUpdate(id, payload, {
+        new: true,
+        runValidators: true,
+    });
+    return updated;
+};
+
+const deleteSubject = async (id: string) => {
+    const subject = await Subject.findById(id);
+    if (!subject) {
+        throw new BadRequestError("Subject not found");
+    }
+
+    subject.isActive = false;
+    await subject.save();
+    return { message: "Subject removed successfully" };
 };
 
 const getSubjectsOrDepartmentsByExamType = async (user:IUser) => {
@@ -118,6 +171,8 @@ const getSubjectsByDepartments = async (user: IUser,departments: Types.ObjectId[
 export const subjectService = {
     createSubject,
     getAllSubjects,
+    updateSubject,
+    deleteSubject,
     getSubjectsOrDepartmentsByExamType,
     getSubjectsByDepartments
 };

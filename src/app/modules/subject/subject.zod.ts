@@ -8,12 +8,16 @@ const createSubjectSchema = z.object({
   examType: z.enum(["semi_matura", "matura", "provime"], {
     message: "Exam type must be semi_matura, matura or provime",
   }),
+  nameInEnglish: z.string().optional(),
+  nameInAlbanian: z.string().optional(),
+  isElective: z.boolean().optional().default(false),
 });
 
+const updateSubjectSchema = createSubjectSchema.partial();
+
 const getSubjectQuerySchema = z.object({
-  examType: z.enum(["semi_matura", "matura", "provime"], {
-    message: "Exam type must be semi_matura, matura or provime",
-  }),
+  examType: z.enum(["semi_matura", "matura", "provime", "all"]).optional(),
+  searchTerm: z.string().optional(),
 });
 
 const getSubjectsByDepartmentsSchema = z.object({
@@ -26,6 +30,10 @@ export type TCreateSubjectPayload = z.infer<
   typeof createSubjectSchema
 >;
 
+export type TUpdateSubjectPayload = z.infer<
+  typeof updateSubjectSchema
+>;
+
 export type TGetSubjectQueryPayload = z.infer<
   typeof getSubjectQuerySchema
 >;
@@ -33,6 +41,7 @@ export type TGetSubjectQueryPayload = z.infer<
 
 const subjectValidationZodSchema = {
   createSubjectSchema,
+  updateSubjectSchema,
   getSubjectQuerySchema,
   getSubjectsByDepartmentsSchema
 };

@@ -59,9 +59,35 @@ const getSubjectsByDepartments = asyncHandler(async (req: Request, res: Response
     });
 });
 
+const updateSubject = asyncHandler(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const result = await subjectService.updateSubject(id, req.body);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Subject updated successfully.",
+        data: result,
+    });
+});
+
+const deleteSubject = asyncHandler(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const result = await subjectService.deleteSubject(id);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Subject deleted successfully.",
+        data: result,
+    });
+});
+
 export const subjectController = {
     createSubjectIntodb,
     getAllSubjects,
+    updateSubject,
+    deleteSubject,
     getSubjectsByType,
     getSubjectsByDepartments
 };

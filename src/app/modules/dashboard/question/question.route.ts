@@ -6,6 +6,8 @@ import { validateFileSizes } from "../../../middlewares/validateFileSize";
 import { USER_ROLE } from "../../user/user.constant";
 import { dashboardQuestionController } from "./question.controller";
 import questionQueryValidationZodSchema from "./question.zod";
+import { subjectController } from "../../subject/subject.controller";
+import subjectValidationZodSchema from "../../subject/subject.zod";
 
 const dashboardQuestionRouter = Router();
 
@@ -21,6 +23,41 @@ dashboardQuestionRouter.get(
   "/meta-filters",
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   dashboardQuestionController.getQuestionMetaFilters
+);
+
+// ── 1.1 Subjects Management ─────────────────────────────────────────────────
+
+dashboardQuestionRouter.get(
+  "/subjects",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    query: subjectValidationZodSchema.getSubjectQuerySchema,
+  }),
+  subjectController.getAllSubjects
+);
+
+dashboardQuestionRouter.post(
+  "/subjects/add",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: subjectValidationZodSchema.createSubjectSchema,
+  }),
+  subjectController.createSubjectIntodb
+);
+
+dashboardQuestionRouter.patch(
+  "/subjects/:id",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: subjectValidationZodSchema.updateSubjectSchema,
+  }),
+  subjectController.updateSubject
+);
+
+dashboardQuestionRouter.delete(
+  "/subjects/:id",
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  subjectController.deleteSubject
 );
 
 // ── 2. Passages Management (Must come before /:questionId routes) ────────────

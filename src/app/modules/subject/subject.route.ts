@@ -22,12 +22,36 @@ subjectRouter.post(
 
 
 subjectRouter.get(
+  '/',
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    query: subjectValidationZodSchema.getSubjectQuerySchema,
+  }),
+  subjectController.getAllSubjects,
+);
+
+subjectRouter.get(
   '/retrieve',
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   validateRequest({
-    query: subjectValidationZodSchema.getSubjectQuerySchema
+    query: subjectValidationZodSchema.getSubjectQuerySchema,
   }),
   subjectController.getAllSubjects,
+);
+
+subjectRouter.patch(
+  '/:id',
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  validateRequest({
+    body: subjectValidationZodSchema.updateSubjectSchema,
+  }),
+  subjectController.updateSubject,
+);
+
+subjectRouter.delete(
+  '/:id',
+  authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+  subjectController.deleteSubject,
 );
 
 subjectRouter.get(
