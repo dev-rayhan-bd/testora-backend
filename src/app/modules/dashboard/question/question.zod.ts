@@ -36,7 +36,7 @@ export const questionListValidation = z.object({
     .number({ message: "Year must be a number" })
     .int({ message: "Year must be an integer" })
     .min(2000, { message: "Year must be 2000 or later" })
-    .max(new Date().getFullYear(), { message: "Year cannot be in the future" })
+    .max(new Date().getFullYear() + 5, { message: "Year cannot exceed reasonable future range" })
     .optional(),
 
   subjectName: z
@@ -119,7 +119,7 @@ export const testListValidation = z.object({
     .number({ message: "Year must be a number" })
     .int({ message: "Year must be an integer" })
     .min(2000, { message: "Year must be 2000 or later" })
-    .max(new Date().getFullYear(), { message: "Year cannot be in the future" })
+    .max(new Date().getFullYear() + 5, { message: "Year cannot exceed reasonable future range" })
     .optional(),
 
   subjectName: z
@@ -226,18 +226,106 @@ export const importTestCsvRowSchema = z.object({
   }
 });
 
+export const updatePassageSchema = z.object({
+  passageCode: z.string().trim().optional(),
+  title: z.string().trim().optional(),
+  content: z.string().trim().optional(),
+  isActive: z.coerce.boolean().optional(),
+});
 
+const questionOptionSchema = z.object({
+  text: z.string({ message: "Option text is required" }).min(1, { message: "Option text cannot be empty" }),
+  imageUrl: z.string().optional(),
+});
 
-export type TCreatePassagePayload = z.infer<
-  typeof passageSchema
->;
+export const createDashboardQuestionSchema = z.object({
+  examType: z.enum([EXAM_TYPES.ENTRANCE_EXAM, EXAM_TYPES.MATURA, EXAM_TYPES.SEMI_MATURA], {
+    message: "Invalid exam type",
+  }),
+  year: z.coerce
+    .number({ message: "Year is required" })
+    .int()
+    .min(2000)
+    .max(new Date().getFullYear() + 5),
+  questionText: z.string({ message: "Question text is required" }).min(1),
+  questionImageUrl: z.string().optional(),
+  options: z.array(questionOptionSchema).min(2).max(4),
+  correctOptionIndex: z.coerce.number().int().min(0).max(3),
+  explanation: z.string().optional(),
+  difficultyLevel: z.enum(["easy", "medium", "hard"]).optional().default("medium"),
+  access: z.enum(["free", "premium"]).optional().default("free"),
+  status: z.enum(["published", "draft", "hidden", "archived"]).optional().default("published"),
+  subject: z.string().optional(),
+  faculty: z.string().optional(),
+  departments: z.array(z.string()).optional(),
+  passage: z.string().optional(),
+  testIds: z.array(z.string()).optional(),
+});
+
+export const updateDashboardQuestionSchema = createDashboardQuestionSchema.partial();
+
+export const updateQuestionStatusSchema = z.object({
+  status: z.enum(["published", "draft", "hidden", "archived"], {
+    message: "Status must be published, draft, hidden, or archived",
+  }),
+});
+
+export const createDashboardTestSchema = z.object({
+  title: z.string({ message: "Test title is required" }).min(1),
+  testCode: z.string({ message: "Test code is required" }).min(1),
+  examType: z.enum([EXAM_TYPES.ENTRANCE_EXAM, EXAM_TYPES.MATURA, EXAM_TYPES.SEMI_MATURA]),
+  year: z.coerce.number().int().min(2000).max(new Date().getFullYear() + 5),
+  testType: z.enum([TEST_TYPES.OFFICIAL, TEST_TYPES.ADDITIONAL]),
+  access: z.enum([ACCESS_TYPES.FREE, ACCESS_TYPES.PREMIUM]),
+  status: z.enum(["published", "draft", "hidden"]).optional().default("published"),
+  subject: z.string().optional(),
+  subjects: z.array(z.string()).optional(),
+  faculty: z.string().optional(),
+  departments: z.array(z.string()).optional(),
+  questionIds: z.array(z.string()).optional(),
+});
+
+export const updateDashboardTestSchema = createDashboardTestSchema.partial();
+
+export const updateTestStatusSchema = z.object({
+  status: z.enum(["published", "draft", "hidden"], {
+    message: "Status must be published, draft, or hidden",
+  }),
+});
+
+export const duplicateTestSchema = z.object({
+  newTestCode: z.string().trim().optional(),
+  newTitle: z.string().trim().optional(),
+  newYear: z.coerce.number().int().min(2000).max(new Date().getFullYear() + 5).optional(),
+});
+
+export const copyYearSchema = z.object({
+  sourceTestId: z.string({ message: "Source test ID is required" }),
+  targetTestId: z.string({ message: "Target test ID is required" }),
+});
+
+export type TCreatePassagePayload = z.infer<typeof passageSchema>;
+export type TUpdatePassagePayload = z.infer<typeof updatePassageSchema>;
 export type TQuestionListInput = z.infer<typeof questionListValidation>;
 export type TTestListInput = z.infer<typeof testListValidation>;
+export type TCreateDashboardQuestionPayload = z.infer<typeof createDashboardQuestionSchema>;
+export type TUpdateDashboardQuestionPayload = z.infer<typeof updateDashboardQuestionSchema>;
+export type TCreateDashboardTestPayload = z.infer<typeof createDashboardTestSchema>;
+export type TUpdateDashboardTestPayload = z.infer<typeof updateDashboardTestSchema>;
 
 const questionQueryValidationZodSchema = {
   questionListValidation,
   testListValidation,
   passageSchema,
+  updatePassageSchema,
+  createDashboardQuestionSchema,
+  updateDashboardQuestionSchema,
+  updateQuestionStatusSchema,
+  createDashboardTestSchema,
+  updateDashboardTestSchema,
+  updateTestStatusSchema,
+  duplicateTestSchema,
+  copyYearSchema,
 };
 
 export default questionQueryValidationZodSchema;

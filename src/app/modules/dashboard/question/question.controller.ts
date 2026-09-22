@@ -105,12 +105,205 @@ const importTestsFromCsvIntoDb = asyncHandler(async (req: Request, res: Response
     });
 });
 
+// ── Question CRUD Handlers ───────────────────────────────────────────────────
+
+const createQuestion = asyncHandler(async (req: Request, res: Response) => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const result = await dashboardQuestionService.createQuestion(req.body, files);
+    sendResponse(res, {
+        statusCode: StatusCodes.CREATED,
+        success: true,
+        message: "Question created successfully.",
+        data: result,
+    });
+});
+
+const updateQuestion = asyncHandler(async (req: Request, res: Response) => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const result = await dashboardQuestionService.updateQuestion(req.params.questionId as string, req.body, files);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Question updated successfully.",
+        data: result,
+    });
+});
+
+const updateQuestionStatus = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.updateQuestionStatus(
+        req.params.questionId as string,
+        req.body.status
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Question status updated successfully.",
+        data: result,
+    });
+});
+
+const deleteQuestion = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.deleteQuestion(req.params.questionId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Question deleted successfully.",
+        data: result,
+    });
+});
+
+// ── Passage CRUD Handlers ────────────────────────────────────────────────────
+
+const getPassageById = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.getPassageById(req.params.passageId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Passage retrieved successfully.",
+        data: result,
+    });
+});
+
+const updatePassage = asyncHandler(async (req: Request, res: Response) => {
+    const files = req.files as PassageFiles | undefined;
+    const result = await dashboardQuestionService.updatePassage(req.params.passageId as string, req.body, files);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Passage updated successfully.",
+        data: result,
+    });
+});
+
+const togglePassageStatus = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.togglePassageStatus(req.params.passageId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Passage status updated successfully.",
+        data: result,
+    });
+});
+
+const deletePassage = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.deletePassage(req.params.passageId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Passage removed successfully.",
+        data: result,
+    });
+});
+
+// ── Test Archive Handlers ────────────────────────────────────────────────────
+
+const createTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.createTest(req.body);
+    sendResponse(res, {
+        statusCode: StatusCodes.CREATED,
+        success: true,
+        message: "Test created successfully.",
+        data: result,
+    });
+});
+
+const getTestById = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.getTestById(req.params.testId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Test retrieved successfully.",
+        data: result,
+    });
+});
+
+const updateTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.updateTest(req.params.testId as string, req.body);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Test updated successfully.",
+        data: result,
+    });
+});
+
+const updateTestStatus = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.updateTestStatus(req.params.testId as string, req.body.status);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Test status updated successfully.",
+        data: result,
+    });
+});
+
+const deleteTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.deleteTest(req.params.testId as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Test deleted successfully.",
+        data: result,
+    });
+});
+
+const duplicateTest = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.duplicateTest(req.params.testId as string, req.body);
+    sendResponse(res, {
+        statusCode: StatusCodes.CREATED,
+        success: true,
+        message: "Test duplicated successfully.",
+        data: result,
+    });
+});
+
+const copyYearQuestions = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.copyYearQuestions(
+        req.body.sourceTestId,
+        req.body.targetTestId
+    );
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
+// ── Meta Filters Handler ─────────────────────────────────────────────────────
+
+const getQuestionMetaFilters = asyncHandler(async (req: Request, res: Response) => {
+    const result = await dashboardQuestionService.getQuestionMetaFilters();
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Question meta filters retrieved successfully.",
+        data: result,
+    });
+});
+
 export const dashboardQuestionController = {
     getQuestionOverview,
     getAllQuestions,
-    getAllTestArchiveIntoDashboard,
-    createPassage,
-    importTestsFromCsvIntoDb,
     getQuestionById,
-    getPassages
-}
+    createQuestion,
+    updateQuestion,
+    updateQuestionStatus,
+    deleteQuestion,
+    getAllTestArchiveIntoDashboard,
+    createTest,
+    getTestById,
+    updateTest,
+    updateTestStatus,
+    deleteTest,
+    duplicateTest,
+    copyYearQuestions,
+    createPassage,
+    getPassages,
+    getPassageById,
+    updatePassage,
+    togglePassageStatus,
+    deletePassage,
+    importTestsFromCsvIntoDb,
+    getQuestionMetaFilters,
+};

@@ -73,14 +73,13 @@ const getAllQuestions = async (input: TQuestionListInput) => {
         matchQuery.passage = new Schema.Types.ObjectId(input.passageId);
     }
 
-    // ── searchTerm → subject / faculty / department name-এ search ──
+    // ── searchTerm → questionText / ID / passage / subject / faculty / department ──
     if (input.searchTerm?.trim()) {
         const term = input.searchTerm.trim();
 
-        const [matchedSubject, matchedFaculty, matchedDepartment] = await Promise.all([
+        const [matchedSubject, matchedFaculty, matchedDepartment, matchedPassage] = await Promise.all([
             Subject.findOne({
                 name: { $regex: term, $options: "i" },
-                // examType select করা থাকলে শুধু সেই examType-এর subject আসবে
                 ...(input.examType && { examType: input.examType }),
             }).select("_id").lean(),
 
@@ -91,25 +90,33 @@ const getAllQuestions = async (input: TQuestionListInput) => {
             Department.findOne({
                 name: { $regex: term, $options: "i" },
             }).select("_id").lean(),
+
+            Passage.findOne({
+                $or: [
+                    { passageCode: { $regex: term, $options: "i" } },
+                    { title: { $regex: term, $options: "i" } },
+                ],
+            }).select("_id").lean(),
         ]);
 
-        const orConditions: Record<string, unknown>[] = [];
+        const orConditions: Record<string, unknown>[] = [
+            { questionText: { $regex: term, $options: "i" } },
+        ];
+
+        if (mongoose.isValidObjectId(term)) {
+            orConditions.push({ _id: new Types.ObjectId(term) });
+        }
 
         if (matchedSubject) orConditions.push({ subject: matchedSubject._id });
         if (matchedFaculty) orConditions.push({ faculty: matchedFaculty._id });
         if (matchedDepartment) orConditions.push({ departments: { $in: [matchedDepartment._id] } });
+        if (matchedPassage) orConditions.push({ passage: matchedPassage._id });
 
-        if (orConditions.length > 0) {
-            // existing $and conditions preserve করো
-            const existing = matchQuery.$and as Record<string, unknown>[] | undefined;
-            matchQuery.$and = [
-                ...(existing ?? []),
-                { $or: orConditions },
-            ];
-        } else {
-            // কোনো match নেই — empty result return করো
-            return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
-        }
+        const existing = matchQuery.$and as Record<string, unknown>[] | undefined;
+        matchQuery.$and = [
+            ...(existing ?? []),
+            { $or: orConditions },
+        ];
     }
 
     // ── Direct ID/name filter (searchTerm ছাড়া explicit filter) ──
@@ -205,6 +212,7 @@ const getAllQuestions = async (input: TQuestionListInput) => {
                             year: 1,
                             questionText: 1,
                             access: 1,
+                            options: 1,
                             correctOptionIndex: 1,
                             difficultyLevel: 1,
                             status: 1,
@@ -263,9 +271,11 @@ const getAllQuestions = async (input: TQuestionListInput) => {
         examType: item.examType,
         year: item.year,
         questionText: item.questionText,
+        options: item.options,
+        correctOptionIndex: item.correctOptionIndex,
+        correctAnswer: item.options?.[item.correctOptionIndex]?.text ?? null,
         access: item.access,
         difficultyLevel: item.difficultyLevel,
-        correctOptionIndex: item.correctOptionIndex,
         status: item.status,
         createdAt: item.createdAt,
         subjectName: item.subject?.name ?? null,
@@ -850,13 +860,523 @@ const importTestsFromFile = async (
     };
 };
 
+// ── Question Management CRUD & Status ────────────────────────────────────────
+
+const createQuestion = async (payload: any, files?: any) => {
+    let questionImageUrl: string | undefined;
+    if (files?.question_image?.[0]) {
+        const uploaded = await uploadToCloudinary(files.question_image[0], "question_images");
+        questionImageUrl = uploaded.secure_url;
+    }
+
+    let options = payload.options;
+    if (typeof options === "string") {
+        try {
+            options = JSON.parse(options);
+        } catch (e) {
+            throw new BadRequestError("Invalid options JSON format");
+        }
+    }
+
+    let departments = payload.departments;
+    if (typeof departments === "string") {
+        try {
+            departments = JSON.parse(departments);
+        } catch (e) {
+            departments = [departments];
+        }
+    }
+
+    const questionData: any = {
+        ...payload,
+        options,
+        departments,
+        questionImageUrl: questionImageUrl || payload.questionImageUrl || null,
+        correctOptionIndex: Number(payload.correctOptionIndex) || 0,
+        year: Number(payload.year),
+    };
+
+    if (payload.subject && mongoose.isValidObjectId(payload.subject)) {
+        questionData.subject = new Types.ObjectId(payload.subject);
+    } else {
+        delete questionData.subject;
+    }
+
+    if (payload.faculty && mongoose.isValidObjectId(payload.faculty)) {
+        questionData.faculty = new Types.ObjectId(payload.faculty);
+    } else {
+        delete questionData.faculty;
+    }
+
+    if (payload.passage && mongoose.isValidObjectId(payload.passage)) {
+        questionData.passage = new Types.ObjectId(payload.passage);
+    } else {
+        delete questionData.passage;
+    }
+
+    const question = await Question.create(questionData);
+
+    if (payload.testIds && Array.isArray(payload.testIds)) {
+        await Test.updateMany(
+            { _id: { $in: payload.testIds } },
+            { $inc: { totalQuestions: 1 } }
+        );
+    }
+
+    return question;
+};
+
+const updateQuestion = async (questionId: string, payload: any, files?: any) => {
+    const question = await Question.findById(questionId);
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
+    let questionImageUrl = question.questionImageUrl;
+    if (files?.question_image?.[0]) {
+        const uploaded = await uploadToCloudinary(files.question_image[0], "question_images");
+        questionImageUrl = uploaded.secure_url;
+    }
+
+    let options = payload.options || question.options;
+    if (typeof options === "string") {
+        try {
+            options = JSON.parse(options);
+        } catch (e) {
+            throw new BadRequestError("Invalid options JSON format");
+        }
+    }
+
+    let departments = payload.departments || question.departments;
+    if (typeof departments === "string") {
+        try {
+            departments = JSON.parse(departments);
+        } catch (e) {
+            departments = [departments];
+        }
+    }
+
+    const updateData: any = {
+        ...payload,
+        options,
+        departments,
+        questionImageUrl,
+    };
+
+    if (payload.year) updateData.year = Number(payload.year);
+    if (payload.correctOptionIndex !== undefined) {
+        updateData.correctOptionIndex = Number(payload.correctOptionIndex);
+    }
+
+    if (payload.subject && mongoose.isValidObjectId(payload.subject)) {
+        updateData.subject = new Types.ObjectId(payload.subject);
+    }
+    if (payload.faculty && mongoose.isValidObjectId(payload.faculty)) {
+        updateData.faculty = new Types.ObjectId(payload.faculty);
+    }
+    if (payload.passage && mongoose.isValidObjectId(payload.passage)) {
+        updateData.passage = new Types.ObjectId(payload.passage);
+    }
+
+    const updatedQuestion = await Question.findByIdAndUpdate(questionId, updateData, {
+        new: true,
+        runValidators: true,
+    });
+
+    return updatedQuestion;
+};
+
+const updateQuestionStatus = async (questionId: string, status: string) => {
+    const question = await Question.findById(questionId);
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
+    question.status = status as any;
+    if (status === "archived") {
+        question.isActive = false;
+    } else {
+        question.isActive = true;
+    }
+
+    await question.save();
+    return question;
+};
+
+const deleteQuestion = async (questionId: string) => {
+    const question = await Question.findById(questionId);
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
+    // Soft delete
+    question.isActive = false;
+    question.status = "archived" as any;
+    await question.save();
+
+    // Decrement test counts if attached
+    if (question.testIds && question.testIds.length > 0) {
+        await Test.updateMany(
+            { _id: { $in: question.testIds } },
+            { $inc: { totalQuestions: -1 } }
+        );
+    }
+
+    return { message: "Question deleted successfully" };
+};
+
+// ── Passage Management ───────────────────────────────────────────────────────
+
+const getPassageById = async (passageId: string) => {
+    const passage = await Passage.findById(passageId);
+    if (!passage) {
+        throw new NotFoundError("Passage not found");
+    }
+
+    const linkedQuestionsCount = await Question.countDocuments({
+        passage: passage._id,
+        isActive: true,
+    });
+
+    return {
+        ...passage.toObject(),
+        linkedQuestionsCount,
+    };
+};
+
+const updatePassage = async (passageId: string, payload: any, files?: any) => {
+    const passage = await Passage.findById(passageId);
+    if (!passage) {
+        throw new NotFoundError("Passage not found");
+    }
+
+    let passageImageUrl = passage.passageImageUrl;
+    if (files?.passage_image?.[0]) {
+        const uploaded = await uploadToCloudinary(files.passage_image[0], "passage_images");
+        passageImageUrl = uploaded.secure_url;
+    }
+
+    if (payload.passageCode && payload.passageCode !== passage.passageCode) {
+        const codeExists = await Passage.findOne({
+            passageCode: payload.passageCode,
+            _id: { $ne: passageId },
+        });
+        if (codeExists) {
+            throw new BadRequestError("Passage with this code already exists");
+        }
+    }
+
+    const updated = await Passage.findByIdAndUpdate(
+        passageId,
+        { ...payload, passageImageUrl },
+        { new: true, runValidators: true }
+    );
+
+    return updated;
+};
+
+const togglePassageStatus = async (passageId: string) => {
+    const passage = await Passage.findById(passageId);
+    if (!passage) {
+        throw new NotFoundError("Passage not found");
+    }
+
+    passage.isActive = !passage.isActive;
+    await passage.save();
+    return passage;
+};
+
+const deletePassage = async (passageId: string) => {
+    const passage = await Passage.findById(passageId);
+    if (!passage) {
+        throw new NotFoundError("Passage not found");
+    }
+
+    passage.isActive = false;
+    await passage.save();
+
+    return { message: "Passage removed successfully" };
+};
+
+// ── Test Archive Management & Tools ──────────────────────────────────────────
+
+const createTest = async (payload: any) => {
+    const existing = await Test.findOne({ testCode: payload.testCode });
+    if (existing) {
+        throw new BadRequestError("A test with this test code already exists");
+    }
+
+    const testData: any = {
+        title: payload.title,
+        testCode: payload.testCode,
+        examType: payload.examType,
+        year: Number(payload.year),
+        testType: payload.testType,
+        access: payload.access,
+        status: payload.status || "published",
+    };
+
+    if (payload.subject && mongoose.isValidObjectId(payload.subject)) {
+        testData.subjects = [new Types.ObjectId(payload.subject)];
+    } else if (payload.subjects && Array.isArray(payload.subjects)) {
+        testData.subjects = payload.subjects.filter((id: string) => mongoose.isValidObjectId(id));
+    }
+
+    if (payload.faculty && mongoose.isValidObjectId(payload.faculty)) {
+        testData.faculty = new Types.ObjectId(payload.faculty);
+    }
+
+    if (payload.departments && Array.isArray(payload.departments)) {
+        testData.departments = payload.departments.filter((id: string) => mongoose.isValidObjectId(id));
+    }
+
+    const test = await Test.create(testData);
+
+    if (payload.questionIds && Array.isArray(payload.questionIds) && payload.questionIds.length > 0) {
+        await Question.updateMany(
+            { _id: { $in: payload.questionIds } },
+            { $addToSet: { testIds: test._id } }
+        );
+        test.totalQuestions = payload.questionIds.length;
+        await test.save();
+    }
+
+    return test;
+};
+
+const getTestById = async (testId: string) => {
+    const test = await Test.findById(testId)
+        .populate("subjects", "name")
+        .populate("faculty", "name")
+        .populate("departments", "name");
+
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
+    const questions = await Question.find({ testIds: test._id, isActive: true })
+        .populate("subject", "name")
+        .populate("passage", "passageCode title");
+
+    return {
+        test,
+        questions,
+    };
+};
+
+const updateTest = async (testId: string, payload: any) => {
+    const test = await Test.findById(testId);
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
+    if (payload.testCode && payload.testCode !== test.testCode) {
+        const codeExists = await Test.findOne({
+            testCode: payload.testCode,
+            _id: { $ne: testId },
+        });
+        if (codeExists) {
+            throw new BadRequestError("A test with this test code already exists");
+        }
+    }
+
+    const updated = await Test.findByIdAndUpdate(testId, payload, {
+        new: true,
+        runValidators: true,
+    });
+
+    if (payload.questionIds && Array.isArray(payload.questionIds)) {
+        // Unlink questions no longer in the list
+        await Question.updateMany(
+            { testIds: testId, _id: { $nin: payload.questionIds } },
+            { $pull: { testIds: testId } }
+        );
+        // Link new questions
+        await Question.updateMany(
+            { _id: { $in: payload.questionIds } },
+            { $addToSet: { testIds: testId } }
+        );
+        updated!.totalQuestions = payload.questionIds.length;
+        await updated!.save();
+    }
+
+    return updated;
+};
+
+const updateTestStatus = async (testId: string, status: string) => {
+    const test = await Test.findById(testId);
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
+    test.status = status as any;
+    await test.save();
+    return test;
+};
+
+const deleteTest = async (testId: string) => {
+    const test = await Test.findById(testId);
+    if (!test) {
+        throw new NotFoundError("Test not found");
+    }
+
+    test.isActive = false;
+    await test.save();
+
+    // Remove test link from questions
+    await Question.updateMany({ testIds: testId }, { $pull: { testIds: testId } });
+
+    return { message: "Test removed successfully" };
+};
+
+const duplicateTest = async (
+    testId: string,
+    payload?: { newTestCode?: string; newTitle?: string; newYear?: number }
+) => {
+    const sourceTest = await Test.findById(testId);
+    if (!sourceTest) {
+        throw new NotFoundError("Source test not found");
+    }
+
+    const timestamp = Date.now().toString().slice(-4);
+    const newTestCode = payload?.newTestCode?.trim() || `${sourceTest.testCode}-COPY-${timestamp}`;
+    const newTitle = payload?.newTitle?.trim() || `${sourceTest.title} (Copy)`;
+    const newYear = payload?.newYear || sourceTest.year;
+
+    const codeExists = await Test.findOne({ testCode: newTestCode });
+    if (codeExists) {
+        throw new BadRequestError("Generated or provided test code already exists");
+    }
+
+    const newTestData: any = {
+        title: newTitle,
+        testCode: newTestCode,
+        examType: sourceTest.examType,
+        year: newYear,
+        testType: sourceTest.testType,
+        access: sourceTest.access,
+        status: "draft",
+        subjects: sourceTest.subjects,
+        faculty: sourceTest.faculty,
+        departments: sourceTest.departments,
+        totalQuestions: sourceTest.totalQuestions,
+    };
+
+    const newTest = await Test.create(newTestData);
+
+    // Link all questions from source test to the new test
+    const questions = await Question.find({ testIds: sourceTest._id, isActive: true });
+    if (questions.length > 0) {
+        const questionIds = questions.map((q) => q._id);
+        await Question.updateMany(
+            { _id: { $in: questionIds } },
+            { $addToSet: { testIds: newTest._id } }
+        );
+        newTest.totalQuestions = questions.length;
+        await newTest.save();
+    }
+
+    return {
+        message: "Test duplicated successfully with all linked questions preserved",
+        test: newTest,
+        copiedQuestionsCount: questions.length,
+    };
+};
+
+const copyYearQuestions = async (sourceTestId: string, targetTestId: string) => {
+    const [sourceTest, targetTest] = await Promise.all([
+        Test.findById(sourceTestId),
+        Test.findById(targetTestId),
+    ]);
+
+    if (!sourceTest) throw new NotFoundError("Source test not found");
+    if (!targetTest) throw new NotFoundError("Target test not found");
+
+    const sourceQuestions = await Question.find({ testIds: sourceTest._id, isActive: true });
+    if (sourceQuestions.length === 0) {
+        throw new BadRequestError("Source test has no questions to copy");
+    }
+
+    const questionIds = sourceQuestions.map((q) => q._id);
+    await Question.updateMany(
+        { _id: { $in: questionIds } },
+        { $addToSet: { testIds: targetTest._id } }
+    );
+
+    const totalQuestions = await Question.countDocuments({ testIds: targetTest._id, isActive: true });
+    targetTest.totalQuestions = totalQuestions;
+    await targetTest.save();
+
+    return {
+        message: `Successfully copied ${questionIds.length} questions from ${sourceTest.title} to ${targetTest.title}`,
+        totalQuestions,
+    };
+};
+
+// ── Dropdown / Meta Filter Options ───────────────────────────────────────────
+
+const getQuestionMetaFilters = async () => {
+    const [subjects, faculties, departments, distinctYears] = await Promise.all([
+        Subject.find({ isActive: true }).select("_id name examType").sort({ name: 1 }).lean(),
+        Faculty.find({ isActive: true }).select("_id name").sort({ name: 1 }).lean(),
+        Department.find({ isActive: true }).select("_id name faculty").sort({ name: 1 }).lean(),
+        Question.distinct("year"),
+    ]);
+
+    const sortedYears = (distinctYears.length > 0 ? distinctYears : [2024, 2025, 2026])
+        .filter((y): y is number => typeof y === "number")
+        .sort((a, b) => b - a);
+
+    return {
+        examTypes: [
+            { label: "Matura", value: "matura" },
+            { label: "Semimatura", value: "semi_matura" },
+            { label: "Entrance Exam (Provime)", value: "provime" },
+        ],
+        years: sortedYears,
+        subjects,
+        faculties,
+        departments,
+        difficultyLevels: [
+            { label: "Easy", value: "easy" },
+            { label: "Medium", value: "medium" },
+            { label: "Hard", value: "hard" },
+        ],
+        accessTypes: [
+            { label: "Free", value: "free" },
+            { label: "Premium", value: "premium" },
+        ],
+        statuses: [
+            { label: "Published", value: "published" },
+            { label: "Draft", value: "draft" },
+            { label: "Hidden", value: "hidden" },
+            { label: "Archived", value: "archived" },
+        ],
+    };
+};
 
 export const dashboardQuestionService = {
     getQuestionOverview,
     getAllQuestions,
+    getQuestionById,
+    createQuestion,
+    updateQuestion,
+    updateQuestionStatus,
+    deleteQuestion,
     getAllTestArchive,
+    createTest,
+    getTestById,
+    updateTest,
+    updateTestStatus,
+    deleteTest,
+    duplicateTest,
+    copyYearQuestions,
     createPassage,
     getPassages,
+    getPassageById,
+    updatePassage,
+    togglePassageStatus,
+    deletePassage,
     importTestsFromFile,
-    getQuestionById,
-}
+    getQuestionMetaFilters,
+};

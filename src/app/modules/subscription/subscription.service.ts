@@ -187,6 +187,7 @@ const getAllSubscriptions = async (query: Record<string, unknown>) => {
     page = 1,
     limit = 10,
     searchTerm,
+    plan,
     product,
     planType,
     status,
@@ -196,12 +197,22 @@ const getAllSubscriptions = async (query: Record<string, unknown>) => {
   const now = new Date();
   const andConditions: any[] = [];
 
-  // Filter: Product
-  if (product && typeof product === "string") {
-    const cleanProduct = product.trim().toLowerCase();
-    if (cleanProduct !== "all" && cleanProduct !== "all products") {
+  // Filter: Product or Plan
+  const targetProductOrPlan = (product || plan) as string | undefined;
+  if (targetProductOrPlan && typeof targetProductOrPlan === "string") {
+    const clean = targetProductOrPlan.trim().toLowerCase();
+    if (clean !== "all" && clean !== "all products" && clean !== "all packages") {
+      let regexPattern = clean;
+      if (clean === "semi_matura" || clean.includes("semi")) regexPattern = "semi";
+      else if (clean === "matura") regexPattern = "^matura|matura package";
+      else if (clean === "provime" || clean.includes("entrance")) regexPattern = "provime|entrance";
+      else if (clean === "full-access" || clean.includes("full")) regexPattern = "full";
+
       andConditions.push({
-        product: { $regex: new RegExp(product.trim(), "i") },
+        $or: [
+          { product: { $regex: new RegExp(regexPattern, "i") } },
+          { plan: { $regex: new RegExp(regexPattern, "i") } },
+        ],
       });
     }
   }
@@ -318,6 +329,7 @@ const getAllSubscriptions = async (query: Record<string, unknown>) => {
         avatar: sub.userDoc?.avatar || null,
       },
       product: sub.product,
+      plan: sub.plan || null,
       planType: formatPlanType(sub.planType),
       startDate: sub.startDate,
       expiryDate: sub.expiryDate,
