@@ -57,7 +57,62 @@ const getAllDepartmentByfaculty = async (user: IUser, faculty: string) => {
     return formattedResult;
 };
 
+const getAllDepartmentsDashboard = async (query?: any) => {
+    const filter: Record<string, unknown> = { isActive: true };
+
+    if (query?.searchTerm?.trim()) {
+        filter.name = { $regex: query.searchTerm.trim(), $options: "i" };
+    }
+    
+    if (query?.faculty) {
+        filter.faculty = query.faculty;
+    }
+
+    const result = await Department.find(filter).populate('faculty', 'name').sort({ createdAt: -1 });
+    return result;
+};
+
+const updateDepartment = async (id: string, payload: any) => {
+    const department = await Department.findById(id);
+    if (!department) {
+        throw new BadRequestError("Department not found");
+    }
+
+    if (payload.name && payload.name !== department.name) {
+        const isExist = await Department.findOne({
+            name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+            faculty: department.faculty,
+            _id: { $ne: id },
+        });
+        if (isExist) {
+            throw new BadRequestError(`Department name "${payload.name}" already exists under this faculty!`);
+        }
+        payload.slug = slugify(payload.name, { lower: true, strict: true });
+    }
+
+    const updated = await Department.findByIdAndUpdate(id, payload, {
+        new: true,
+        runValidators: true,
+    });
+    return updated;
+};
+
+const deleteDepartment = async (id: string) => {
+    const department = await Department.findById(id);
+    if (!department) {
+        throw new BadRequestError("Department not found");
+    }
+
+    department.isActive = false;
+    await department.save();
+    return { message: "Department removed successfully" };
+};
+
+
 export const departmentService = {
     createDepartmentUnderFaculty,
     getAllDepartmentByfaculty,
+    getAllDepartmentsDashboard,
+    updateDepartment,
+    deleteDepartment,
 };

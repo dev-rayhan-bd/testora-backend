@@ -4193,6 +4193,179 @@
           ]
         }
       ]
+    },
+    {
+      "name": "11. Admin & Dashboard Operations",
+      "item": [
+        {
+          "name": "Question & Master Data Management",
+          "item": [
+            {
+              "name": "Create Faculty",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Faculty of Engineering\",\n    \"nameInEnglish\": \"Faculty of Engineering\",\n    \"nameInAlbanian\": \"Fakulteti i Inxhinierisë\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/faculty/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "faculty",
+                    "add"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Faculties",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/faculty?searchTerm=Engineering",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "faculty"
+                  ],
+                  "query": [
+                    {
+                      "key": "searchTerm",
+                      "value": "Engineering"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Department",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Computer Science\",\n    \"nameInEnglish\": \"Computer Science\",\n    \"nameInAlbanian\": \"Shkenca Kompjuterike\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/department/add/{{facultyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "department",
+                    "add",
+                    "{{facultyId}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Departments",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/department?faculty={{facultyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "department"
+                  ],
+                  "query": [
+                    {
+                      "key": "faculty",
+                      "value": "{{facultyId}}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Dashboard - Create Single Question",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "{\n  \"examType\": \"provime\",\n  \"year\": 2024,\n  \"access\": \"free\",\n  \"questionText\": \"What is 2+2?\",\n  \"correctOptionIndex\": 0,\n  \"options\": [{\"text\": \"4\"}, {\"text\": \"5\"}],\n  \"faculty\": \"{{facultyId}}\",\n  \"departments\": [\"{{departmentId}}\"],\n  \"subject\": \"{{subjectId}}\",\n  \"imageName\": \"single_image.png\"\n}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "question_image",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "add"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Dashboard - Create Batch Questions",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "data",
+                      "value": "[\n  {\n    \"questionText\": \"Batch Question 1 without image\",\n    \"examType\": \"matura\",\n    \"year\": 2024,\n    \"subject\": \"{{subjectId}}\",\n    \"options\": [{\"text\": \"A\"}, {\"text\": \"B\"}],\n    \"correctOptionIndex\": 0\n  },\n  {\n    \"questionText\": \"Batch Question 2 with image\",\n    \"imageName\": \"sample_image.png\",\n    \"examType\": \"matura\",\n    \"year\": 2024,\n    \"subject\": \"{{subjectId}}\",\n    \"options\": [{\"text\": \"A\"}, {\"text\": \"B\"}],\n    \"correctOptionIndex\": 1\n  }\n]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "question_image",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/questions/add",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "questions",
+                    "add"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

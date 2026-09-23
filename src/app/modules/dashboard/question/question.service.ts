@@ -760,7 +760,7 @@ const createPassage = async (payload: TCreatePassagePayload
 
 // get passages
 const getPassages = async (query: Record<string, unknown>) => {
-    const { searchTerm, page, limit } = query;
+    const { searchTerm, page, limit, status } = query;
 
     // 1. Number convert kora ebong fallback set kora
     const pageNumber = parseInt(page as string) || 1;
@@ -768,7 +768,15 @@ const getPassages = async (query: Record<string, unknown>) => {
     const skip = (pageNumber - 1) * limitNumber;
 
     // 2. Dynamic query object toiri kora
-    const mongooseQuery: any = { isActive: true };
+    const mongooseQuery: any = {};
+
+    if (status === "active") {
+        mongooseQuery.isActive = true;
+    } else if (status === "inactive") {
+        mongooseQuery.isActive = false;
+    } else if (status !== "all") {
+        mongooseQuery.isActive = true; // Default to active if status is not explicitly "all" or "inactive"
+    }
 
     if (searchTerm) {
         mongooseQuery.$or = [
@@ -879,67 +887,137 @@ const importTestsFromFile = async (
 // ── Question Management CRUD & Status ────────────────────────────────────────
 
 const createQuestion = async (payload: any, files?: any) => {
-    let questionImageUrl: string | undefined;
-    if (files?.question_image?.[0]) {
-        const uploaded = await uploadToCloudinary(files.question_image[0], "question_images");
-        questionImageUrl = uploaded.secure_url;
-    }
+    let questionsPayload: any[] = [];
+    let isBulk = false;
 
-    let options = payload.options;
-    if (typeof options === "string") {
-        try {
-            options = JSON.parse(options);
-        } catch (e) {
-            throw new BadRequestError("Invalid options JSON format");
+    // The user screenshot shows data field
+    const rawQuestions = payload.data || payload.questions;
+
+    if (rawQuestions) {
+        isBulk = true;
+        if (typeof rawQuestions === "string") {
+            try {
+                const parsed = JSON.parse(rawQuestions);
+                if (parsed.questions && Array.isArray(parsed.questions)) {
+                    // Extract common metadata by removing the 'questions' array
+                    const { questions, ...commonMetadata } = parsed;
+                    questionsPayload = questions.map((q: any) => ({ ...commonMetadata, ...q }));
+                } else if (Array.isArray(parsed)) {
+                    questionsPayload = parsed;
+                } else {
+                    questionsPayload = [parsed];
+                }
+            } catch (e) {
+                throw new BadRequestError("Invalid questions/data JSON format");
+            }
+        } else if (typeof rawQuestions === "object" && rawQuestions !== null) {
+            if (rawQuestions.questions && Array.isArray(rawQuestions.questions)) {
+                const { questions, ...commonMetadata } = rawQuestions;
+                questionsPayload = questions.map((q: any) => ({ ...commonMetadata, ...q }));
+            } else if (Array.isArray(rawQuestions)) {
+                questionsPayload = rawQuestions;
+            } else {
+                questionsPayload = [rawQuestions];
+            }
         }
+    } else if (Array.isArray(payload)) {
+        isBulk = true;
+        questionsPayload = payload;
+    } else {
+        questionsPayload = [payload];
     }
 
-    let departments = payload.departments;
-    if (typeof departments === "string") {
-        try {
-            departments = JSON.parse(departments);
-        } catch (e) {
-            departments = [departments];
+    // Process image uploads (array of files) and map them by their original filename
+    const uploadedImagesMap: Record<string, string> = {};
+    if (files?.question_image) {
+        const imageFiles = Array.isArray(files.question_image) ? files.question_image : [files.question_image];
+        
+        // Upload all images concurrently
+        const uploadPromises = imageFiles.map(async (file: any) => {
+            const uploaded = await uploadToCloudinary(file, "question_images");
+            // Map the secure_url to the original file name
+            uploadedImagesMap[file.originalname] = uploaded.secure_url;
+            return uploaded;
+        });
+        await Promise.all(uploadPromises);
+    }
+
+    const testIdsToUpdate = new Set<string>();
+
+    const questionsToInsert = questionsPayload.map((qPayload, index) => {
+        let options = qPayload.options;
+        if (typeof options === "string") {
+            try {
+                options = JSON.parse(options);
+            } catch (e) {
+                throw new BadRequestError(`Invalid options JSON format at index ${index}`);
+            }
         }
-    }
 
-    const questionData: any = {
-        ...payload,
-        options,
-        departments,
-        questionImageUrl: questionImageUrl || payload.questionImageUrl || null,
-        correctOptionIndex: Number(payload.correctOptionIndex) || 0,
-        year: Number(payload.year),
-    };
+        let departments = qPayload.departments;
+        if (typeof departments === "string") {
+            try {
+                departments = JSON.parse(departments);
+            } catch (e) {
+                departments = [departments];
+            }
+        }
 
-    if (payload.subject && mongoose.isValidObjectId(payload.subject)) {
-        questionData.subject = new Types.ObjectId(payload.subject);
-    } else {
-        delete questionData.subject;
-    }
+        let questionImageUrl = null;
+        if (isBulk && qPayload.imageName && uploadedImagesMap[qPayload.imageName]) {
+            // Map by explicitly passed imageName
+            questionImageUrl = uploadedImagesMap[qPayload.imageName];
+        } else if (!isBulk && Object.keys(uploadedImagesMap).length > 0) {
+            // Fallback for single legacy upload
+            questionImageUrl = Object.values(uploadedImagesMap)[0];
+        } else if (qPayload.questionImageUrl) {
+            questionImageUrl = qPayload.questionImageUrl;
+        }
 
-    if (payload.faculty && mongoose.isValidObjectId(payload.faculty)) {
-        questionData.faculty = new Types.ObjectId(payload.faculty);
-    } else {
-        delete questionData.faculty;
-    }
+        const questionData: any = {
+            ...qPayload,
+            options,
+            departments,
+            questionImageUrl,
+            correctOptionIndex: Number(qPayload.correctOptionIndex) || 0,
+            year: Number(qPayload.year) || undefined,
+        };
 
-    if (payload.passage && mongoose.isValidObjectId(payload.passage)) {
-        questionData.passage = new Types.ObjectId(payload.passage);
-    } else {
-        delete questionData.passage;
-    }
+        if (qPayload.subject && mongoose.isValidObjectId(qPayload.subject)) {
+            questionData.subject = new Types.ObjectId(qPayload.subject);
+        } else {
+            delete questionData.subject;
+        }
 
-    const question = await Question.create(questionData);
+        if (qPayload.faculty && mongoose.isValidObjectId(qPayload.faculty)) {
+            questionData.faculty = new Types.ObjectId(qPayload.faculty);
+        } else {
+            delete questionData.faculty;
+        }
 
-    if (payload.testIds && Array.isArray(payload.testIds)) {
+        if (qPayload.passage && mongoose.isValidObjectId(qPayload.passage)) {
+            questionData.passage = new Types.ObjectId(qPayload.passage);
+        } else {
+            delete questionData.passage;
+        }
+
+        if (qPayload.testIds && Array.isArray(qPayload.testIds)) {
+            qPayload.testIds.forEach((id: string) => testIdsToUpdate.add(id));
+        }
+
+        return questionData;
+    });
+
+    const createdQuestions = await Question.insertMany(questionsToInsert);
+
+    if (testIdsToUpdate.size > 0) {
         await Test.updateMany(
-            { _id: { $in: payload.testIds } },
-            { $inc: { totalQuestions: 1 } }
+            { _id: { $in: Array.from(testIdsToUpdate) } },
+            { $inc: { totalQuestions: createdQuestions.length } }
         );
     }
 
-    return question;
+    return isBulk ? createdQuestions : createdQuestions[0];
 };
 
 const updateQuestion = async (questionId: string, payload: any, files?: any) => {

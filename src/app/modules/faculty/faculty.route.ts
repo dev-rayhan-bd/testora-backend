@@ -23,8 +23,33 @@ facultyRouter.post(
 
 
 facultyRouter.get(
+    '/',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    validateRequest({
+        query: facultyValidationZodSchema.getAllFacultiesDashboardQuerySchema,
+    }),
+    facultyController.getAllFacultiesDashboard,
+);
+
+facultyRouter.get(
     '/retrieve',
     authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN, USER_ROLE.STUDENT),
     facultyController.getAllFaculties,
 );
+
+facultyRouter.patch(
+    '/:id',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    validateRequest({
+        body: facultyValidationZodSchema.updateFacultySchema,
+    }),
+    facultyController.updateFaculty,
+);
+
+facultyRouter.delete(
+    '/:id',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    facultyController.deleteFaculty,
+);
+
 export default facultyRouter;

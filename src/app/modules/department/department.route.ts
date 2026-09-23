@@ -21,8 +21,33 @@ departmentRouter.post(
 );
 
 departmentRouter.get(
+    '/',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    validateRequest({
+        query: departmentValidationZodSchema.getAllDepartmentsDashboardQuerySchema,
+    }),
+    departmentController.getAllDepartmentsDashboard,
+);
+
+departmentRouter.get(
     '/retrieve/:facultyId',
     authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN, USER_ROLE.STUDENT),
     departmentController.getAllDepartments,
 );
+
+departmentRouter.patch(
+    '/:id',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    validateRequest({
+        body: departmentValidationZodSchema.updateDepartmentSchema,
+    }),
+    departmentController.updateDepartment,
+);
+
+departmentRouter.delete(
+    '/:id',
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    departmentController.deleteDepartment,
+);
+
 export default departmentRouter;

@@ -48,7 +48,56 @@ const getAllFaculties = async (user:IUser) => {
     return formattedResult;
 };
 
+const getAllFacultiesDashboard = async (query?: any) => {
+    const filter: Record<string, unknown> = { isActive: true };
+
+    if (query?.searchTerm?.trim()) {
+        filter.name = { $regex: query.searchTerm.trim(), $options: "i" };
+    }
+
+    const result = await Faculty.find(filter).sort({ createdAt: -1 });
+    return result;
+};
+
+const updateFaculty = async (id: string, payload: any) => {
+    const faculty = await Faculty.findById(id);
+    if (!faculty) {
+        throw new BadRequestError("Faculty not found");
+    }
+
+    if (payload.name && payload.name !== faculty.name) {
+        const isExist = await Faculty.findOne({
+            name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+            _id: { $ne: id },
+        });
+        if (isExist) {
+            throw new BadRequestError(`Faculty name "${payload.name}" already exists!`);
+        }
+        payload.slug = slugify(payload.name, { lower: true, strict: true });
+    }
+
+    const updated = await Faculty.findByIdAndUpdate(id, payload, {
+        new: true,
+        runValidators: true,
+    });
+    return updated;
+};
+
+const deleteFaculty = async (id: string) => {
+    const faculty = await Faculty.findById(id);
+    if (!faculty) {
+        throw new BadRequestError("Faculty not found");
+    }
+
+    faculty.isActive = false;
+    await faculty.save();
+    return { message: "Faculty removed successfully" };
+};
+
 export const facultyService = {
     createFaculty,
     getAllFaculties,
+    getAllFacultiesDashboard,
+    updateFaculty,
+    deleteFaculty,
 };

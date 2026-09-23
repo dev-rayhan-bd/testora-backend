@@ -37,7 +37,7 @@ dashboardQuestionRouter.get(
 );
 
 dashboardQuestionRouter.post(
-  "/subjects/add",
+  "/subjects",
   authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
   validateRequest({
     body: subjectValidationZodSchema.createSubjectSchema,

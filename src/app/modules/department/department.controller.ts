@@ -30,7 +30,45 @@ const getAllDepartments = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 
+const getAllDepartmentsDashboard = asyncHandler(async (req: Request, res: Response) => {
+    const result = await departmentService.getAllDepartmentsDashboard(req.query);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Departments retrieved successfully.",
+        data: result,
+    });
+});
+
+const updateDepartment = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await departmentService.updateDepartment(id as string, req.body);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Department updated successfully.",
+        data: result,
+    });
+});
+
+const deleteDepartment = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await departmentService.deleteDepartment(id as string);
+
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Department deleted successfully.",
+        data: result,
+    });
+});
+
 export const departmentController = {
     createDepartmentIntodb,
     getAllDepartments,
+    getAllDepartmentsDashboard,
+    updateDepartment,
+    deleteDepartment,
 };
