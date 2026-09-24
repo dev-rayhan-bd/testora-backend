@@ -41,7 +41,8 @@ app.use(
       'https://testora-dashboard.vercel.app',
       'https://testora-dashboards.vercel.app',
       'https://testora-frontend.vercel.app',
-      'http://10.10.28.99:3000'
+      'http://10.10.28.99:3000',
+      'https://testora-dashboard-alpha.vercel.app'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
