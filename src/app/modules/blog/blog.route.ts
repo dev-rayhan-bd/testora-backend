@@ -31,14 +31,14 @@ blogRouter.put(
 
 blogRouter.get(
     '/list',
-    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN,USER_ROLE.STUDENT),
     blogController.getAllBlogsFromDb,
 );
 
 
 blogRouter.get(
     '/details/:id',
-    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),
+    authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN,USER_ROLE.STUDENT),
     blogController.getAllBlogDetailsFromDb,
 );
 
