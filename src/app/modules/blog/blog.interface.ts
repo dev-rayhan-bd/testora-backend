@@ -6,6 +6,7 @@ export interface BlogFiles {
 
 export interface IBlog extends Document {
     title: string;
+    slug: string;
     content: string;
     image: string | null;
     seoTitle: string | null;

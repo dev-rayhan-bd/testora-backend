@@ -1,4 +1,5 @@
 
+import slugify from 'slugify';
 import { deleteImageFromCloudinary } from "../../cloudinary/deleteImageFromCloudinary";
 import { uploadToCloudinary } from "../../cloudinary/uploadImageToCLoudinary";
 import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
@@ -44,6 +45,7 @@ const createBlog = async (payload: TCreateBlogPayload, files: BlogFiles) => {
         ...payload,
         image: passageImageUrl || null,
         status: payload.status,
+        slug: slugify(payload.title, { lower: true, strict: true }),
         publishedAt:
             payload.status === 'published' && !payload.publishedAt
                 ? new Date()
@@ -131,6 +133,7 @@ const getAllBlogs = async (query: Record<string, unknown>) => {
                               $project: {
                                   _id: 1,
                                   title: 1,
+                                  slug: 1,
                                   category: 1,
                                   image: 1,
                                   status: 1,
@@ -172,6 +175,14 @@ const getBlogDetails = async (id: string) => {
        return blog;
 };
 
+const getBlogDetailsBySlug = async (slug: string) => {
+       const blog = await Blog.findOneAndUpdate({ slug }, { $inc: { views: 1 } }, { new: true });
+       if (!blog) {
+           throw new NotFoundError("Blog not found");
+       }
+       return blog;
+};
+
 const deleteBlog = async (id: string) => {
        const blog = await Blog.findByIdAndDelete(id);
        if (!blog) {
@@ -185,5 +196,6 @@ export const blogService = {
     updateBlog,
     getAllBlogs,
     getBlogDetails,
+    getBlogDetailsBySlug,
     deleteBlog
 };

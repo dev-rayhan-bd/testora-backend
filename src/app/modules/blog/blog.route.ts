@@ -42,6 +42,11 @@ blogRouter.get(
     blogController.getAllBlogDetailsFromDb,
 );
 
+blogRouter.get(
+    '/slug/:slug',
+    blogController.getBlogDetailsBySlugFromDb,
+);
+
 blogRouter.delete(
     '/delete/:id',
     authMiddleware(USER_ROLE.SUPER_ADMIN, USER_ROLE.ADMIN),

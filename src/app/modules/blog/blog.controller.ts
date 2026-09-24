@@ -53,6 +53,16 @@ const getAllBlogDetailsFromDb = asyncHandler(async (req: Request, res: Response)
     });
 })
 
+const getBlogDetailsBySlugFromDb = asyncHandler(async (req: Request, res: Response) => {
+    const result = await blogService.getBlogDetailsBySlug(req.params.slug as string);
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Blog details retrieved successfully.",
+        data: result,
+    });
+})
+
 const deleteBlogFromDb = asyncHandler(async (req: Request, res: Response) => {
     const result = await blogService.deleteBlog(req.params.id as string);
     sendResponse(res, {
@@ -68,5 +78,6 @@ export const blogController = {
     updateBlogIntoDb,
     getAllBlogsFromDb,
     getAllBlogDetailsFromDb,
+    getBlogDetailsBySlugFromDb,
     deleteBlogFromDb
 };
