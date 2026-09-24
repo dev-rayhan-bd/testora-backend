@@ -55,7 +55,7 @@ const createProductSchema = z
       .regex(/^[0-9a-fA-F]{24}$/, {
         message: 'Invalid Category ID. Must be a valid 24-character hexadecimal ObjectId',
       }),
-    brand: z.literal('Testora').default('Testora'),
+    brand: z.string().trim().default('Testora'),
     images: z
       .array(
         z.string().url({ message: 'Each image must be a valid URL' }),
@@ -123,7 +123,7 @@ const updateProductSchema = z
         message: 'Invalid Category ID. Must be a valid 24-character hexadecimal ObjectId',
       })
       .optional(),
-    brand: z.literal('Testora').optional(),
+    brand: z.string().trim().optional(),
     images: z
       .array(
         z.string().url({ message: 'Each image must be a valid URL' }),

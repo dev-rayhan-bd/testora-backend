@@ -49,8 +49,8 @@ const getProductDetails = asyncHandler(async (req: Request, res: Response) => {
   const idOrSlug = req.params.idOrSlug as string;
   // If user is admin, allow viewing draft/hidden products
   const isAdmin =
-    req.user &&
-    (req.user.role === 'admin' || req.user.role === 'super-admin');
+    (req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) ||
+    Boolean(req.originalUrl && req.originalUrl.includes('/admin'));
 
   const result = await productService.getProductByIdOrSlug(idOrSlug, !!isAdmin);
 

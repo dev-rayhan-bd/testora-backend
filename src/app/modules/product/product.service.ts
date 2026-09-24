@@ -91,7 +91,7 @@ const createProduct = async (
     ...payload,
     category: categoryId,
     images: finalImages,
-    brand: PRODUCT_BRAND,
+    brand: payload.brand,
     isDeleted: false,
   };
 

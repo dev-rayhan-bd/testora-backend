@@ -33,7 +33,7 @@ userRouter.get(
 
 userRouter.patch(
   '/update-profile',
-  authMiddleware(USER_ROLE.STUDENT),
+  authMiddleware(USER_ROLE.STUDENT, USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
   validateRequest({
     body: userValidationZodSchema.updateUserProfileSchema,
   }),
@@ -52,7 +52,7 @@ userRouter.patch(
 
 userRouter.patch(
   '/update-profile-image',
-  authMiddleware(USER_ROLE.STUDENT),
+  authMiddleware(USER_ROLE.STUDENT, USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
   uploadFile(),
   validateFileSizes,
   userController.updateUserProfileImage,
@@ -60,7 +60,7 @@ userRouter.patch(
 
 userRouter.get(
   '/get-profile',
-  authMiddleware(USER_ROLE.STUDENT),
+  authMiddleware(USER_ROLE.STUDENT, USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
   userController.getUserProfile,
 );
 
