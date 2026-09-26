@@ -125,15 +125,20 @@ const getYearRange = async () => {
 const getMandatorySubjects = async (user: IUser, testId: string) => {
   // Ekhane populate er por space diye shudhu darkari fields select kora hoyeche
   const test = await Test.findById(testId)
-    .populate("mandatorySubjects", "name") // Ekhane mandatorySubjects theke 'name' r 'code' select hobe
-    .populate("electiveSubjects", "name")
+    .populate("mandatorySubjects", "name nameInEnglish nameInAlbanian")
+    .populate("electiveSubjects", "name nameInEnglish nameInAlbanian")
     .lean();
 
   if (!test) throw new NotFoundError("Test not found.");
 
+  const mapSubject = (sub: any) => ({
+      _id: sub._id,
+      name: user.language === 'english' ? sub.nameInEnglish : sub.nameInAlbanian,
+  });
+
   return {
-    mandatorySubjects: user.plan === 'matura' ? test.mandatorySubjects : [],
-    electiveSubjects: user.plan === 'matura' ? test.electiveSubjects : []
+    mandatorySubjects: user.plan === 'matura' ? (test.mandatorySubjects as any[]).map(mapSubject) : [],
+    electiveSubjects: user.plan === 'matura' ? (test.electiveSubjects as any[]).map(mapSubject) : []
   };
 };
 
@@ -465,11 +470,11 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 // submit single answer
 
 // complete quiz session
-const completeQuiz = async (sessionId: string, userId: Types.ObjectId) => {
+const completeQuiz = async (sessionId: string, user: IUser) => {
   const session = await QuizSession.findOne({
     _id: new Types.ObjectId(sessionId),
-    user: userId,
-  }).populate("questionSubjectMap.subjectId", "name");
+    user: user._id,
+  }).populate("questionSubjectMap.subjectId", "name nameInEnglish nameInAlbanian");
 
   if (!session) throw new NotFoundError("Session not found.");
   if (session.status === "completed") throw new BadRequestError("Quiz already completed.");
@@ -509,7 +514,7 @@ const completeQuiz = async (sessionId: string, userId: Types.ObjectId) => {
   for (const q of session.questionSubjectMap) {
     const subjectDoc = q.subjectId as any;
     const key = (subjectDoc._id ?? subjectDoc).toString();
-    const subjectName = subjectDoc.name ?? "";
+    const subjectName = user.language === 'english' ? (subjectDoc.nameInEnglish || subjectDoc.name) : (subjectDoc.nameInAlbanian || subjectDoc.name) || "";
 
     if (!subjectResultMap.has(key)) {
       subjectResultMap.set(key, {
@@ -545,7 +550,7 @@ const completeQuiz = async (sessionId: string, userId: Types.ObjectId) => {
     const attempt = attemptMap.get(qId.toString());
     const subjectDoc = questionSubjectLookup.get(qId.toString()) as any;
     const key = (subjectDoc?._id ?? subjectDoc)?.toString() ?? "unknown";
-    const name = subjectDoc?.name ?? "";
+    const name = user.language === 'english' ? (subjectDoc?.nameInEnglish || subjectDoc?.name) : (subjectDoc?.nameInAlbanian || subjectDoc?.name) || "";
 
     if (!subjectQuestionMap.has(key)) {
       subjectQuestionMap.set(key, {

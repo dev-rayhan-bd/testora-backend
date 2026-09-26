@@ -76,7 +76,7 @@ const startQuiz = asyncHandler(async (req: Request, res: Response) => {
 
 const completeQuiz = asyncHandler(async (req: Request, res: Response) => {
   const { sessionId } = req.params;
-  const result = await quizSessionService.completeQuiz(sessionId as string, req.user._id);
+  const result = await quizSessionService.completeQuiz(sessionId as string, req.user);
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,
     success: true,

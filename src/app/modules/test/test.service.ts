@@ -290,6 +290,7 @@ const getAllOfficialTests = async (input: {
   examType?: string;
   faculty?: string;
   departments?: string[];   // string[] now
+  language?: string;
   page?: number;
   limit?: number;
 }) => {
@@ -300,6 +301,7 @@ const getAllAdditionalTests = async (input: {
   examType?: string;
   faculty?: string;
   departments?: string[];   // string[] now
+  language?: string;
   page?: number;
   limit?: number;
 }) => {

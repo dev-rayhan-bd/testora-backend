@@ -127,7 +127,7 @@ const getSubjectsOrDepartmentsByExamType = async (user:IUser) => {
         const departments = await Department.find({ faculty: faculty?._id, examType: user.plan, isActive: true });
         return departments.map(department => ({
             departmentId: department._id,
-            name: department.name,
+            name: user.language === USER_LANGUAGES.ENGLISH ? department.nameInEnglish : department.nameInAlbanian,
             slug: department.slug,
         }));
     }

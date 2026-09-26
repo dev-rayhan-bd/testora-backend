@@ -46,6 +46,7 @@ const getAllOfficialTestsIntoDb = asyncHandler(async (req: Request, res: Respons
       examType: req.user.plan as string,
       faculty: req.user.faculty as string,
       departments: departments as string[],
+      language: req.user.language as string,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
     } as any);
@@ -64,6 +65,7 @@ const getAllAdditionalTestsIntoDb = asyncHandler(async (req: Request, res: Respo
     examType: req.user.plan as string,
     faculty: req.user.faculty as string,
     departments: departments as string[],
+    language: req.user.language as string,
     page: page ? Number(page) : 1,
     limit: limit ? Number(limit) : 20,
   } as any);

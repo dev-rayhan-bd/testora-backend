@@ -233,6 +233,7 @@ export const getPaginatedTestsByType = async (
         examType?: string;
         faculty?: string;
         departments?: string[];  // department names array
+        language?: string;
         page?: number;
         limit?: number;
     }
@@ -303,7 +304,7 @@ export const getPaginatedTestsByType = async (
     ]);
 
     const subjectsList = await Subject.find({ _id: { $in: tests.flatMap(test => test.subjects || []) }, examType: input.examType })
-        .select("_id name")
+        .select("_id name nameInEnglish nameInAlbanian")
         .lean();
 
     console.log({ subjectsList })
@@ -317,7 +318,12 @@ export const getPaginatedTestsByType = async (
             title: test.title,
             totalQuestions: test.totalQuestions,
 
-            subjects: subjectsList.filter(subject => testSubjectIds.includes(subject._id.toString())),
+            subjects: subjectsList
+                .filter(subject => testSubjectIds.includes(subject._id.toString()))
+                .map(sub => ({
+                    _id: sub._id,
+                    name: input.language === 'english' ? sub.nameInEnglish : sub.nameInAlbanian
+                })),
             totalSubjects: test.subjects?.length || 0,
             access: test.access,
             isLock: test.access === "premium",
