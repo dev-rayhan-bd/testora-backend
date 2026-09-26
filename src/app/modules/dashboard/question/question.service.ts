@@ -622,9 +622,9 @@ const getAllTestArchive = async (input: TTestListInput) => {
         {
             $lookup: {
                 from: "subjects",
-                localField: "subject",
+                localField: "subjects",
                 foreignField: "_id",
-                as: "subjectDetails",
+                as: "subjectsDetails",
             },
         },
         {
@@ -644,7 +644,6 @@ const getAllTestArchive = async (input: TTestListInput) => {
             },
         },
 
-        { $unwind: { path: "$subjectDetails", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$facultyDetails", preserveNullAndEmptyArrays: true } },
         // passageDetails $lookup নেই তাই $unwind সরিয়ে দেওয়া হয়েছে
 
@@ -668,12 +667,13 @@ const getAllTestArchive = async (input: TTestListInput) => {
                             status: 1,
                             createdAt: 1,
                             totalQuestions: 1,
+                            subjects: "$subjectsDetails",
                             subject: {
                                 $cond: {
-                                    if: { $ifNull: ["$subjectDetails", false] },
+                                    if: { $gt: [{ $size: { $ifNull: ["$subjectsDetails", []] } }, 0] },
                                     then: {
-                                        _id: { $ifNull: ["$subjectDetails._id", null] },
-                                        name: { $ifNull: ["$subjectDetails.name", null] },
+                                        _id: { $arrayElemAt: ["$subjectsDetails._id", 0] },
+                                        name: { $arrayElemAt: ["$subjectsDetails.name", 0] },
                                     },
                                     else: null,
                                 },
@@ -1363,6 +1363,13 @@ const updateTest = async (testId: string, payload: any) => {
         if (codeExists) {
             throw new BadRequestError("A test with this test code already exists");
         }
+    }
+
+    if (payload.subject && mongoose.isValidObjectId(payload.subject)) {
+        payload.subjects = [new Types.ObjectId(payload.subject)];
+        delete payload.subject;
+    } else if (payload.subjects && Array.isArray(payload.subjects)) {
+        payload.subjects = payload.subjects.filter((id: string) => mongoose.isValidObjectId(id));
     }
 
     const updated = await Test.findByIdAndUpdate(testId, payload, {

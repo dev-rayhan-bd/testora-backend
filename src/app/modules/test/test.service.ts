@@ -745,9 +745,7 @@ const updateTest = async (
   const test = await Test.findById(id);
   if (!test || !test.isActive) throw new NotFoundError("Test not found");
 
-  if (test.status === "published") {
-    throw new BadRequestError("Cannot edit a published test");
-  }
+  // Allow editing published tests (like subjects, title)
 
   Object.assign(test, payload);
   await test.save();
