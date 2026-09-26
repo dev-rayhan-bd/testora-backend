@@ -1,6 +1,10 @@
 import { QUIZ_STATUS } from "../quiz-session/quiz.session.constant";
 import { QuizSession } from "../quiz-session/quiz.session.model";
 import { IUser } from "../user/user.interface";
+import Question from "../question/question.model";
+import Test from "../test/test.model";
+import Subject from "../subject/subject.model";
+import { EXAM_TYPES } from "../../../interfaces";
 
 const getExamReadiness = async (user: IUser) => {
     const sevenDaysAgo = new Date();
@@ -234,5 +238,29 @@ export const userDashboardService = {
     getWeakTopics,
     getInProgressSessions,
     getRecentActivity,
-    getSubscription
+    getSubscription,
+    getPlatformStats
 }
+
+
+/**
+ * Public-facing platform statistics for landing/home page.
+ * Returns: total questions, total tests, total subjects, practice modes count.
+ */
+async function getPlatformStats() {
+  const [totalQuestions, totalTests, totalSubjects] = await Promise.all([
+    Question.countDocuments({ isActive: true }),
+    Test.countDocuments({ isActive: true }),
+    Subject.countDocuments({ isActive: true }),
+  ]);
+
+  // Practice modes = number of distinct exam types (semi_matura, matura, provime)
+  const practiceModes = Object.values(EXAM_TYPES).length;
+
+  return {
+    practiceQuestions: totalQuestions,
+    fullExamTests: totalTests,
+    subjectsCovered: totalSubjects,
+    practiceModes,
+  };
+}

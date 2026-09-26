@@ -12,4 +12,7 @@ homeDashboardRouter.get('/recent-activity', authMiddleware(USER_ROLE.STUDENT), u
 homeDashboardRouter.get('/subscription-plan', authMiddleware(USER_ROLE.STUDENT), userDashboardController.getSubscriptionPlan);
 homeDashboardRouter.get('/weak-topics', authMiddleware(USER_ROLE.STUDENT), userDashboardController.getWeakTopics);
 
+// Public route - no auth needed (for landing page stats)
+homeDashboardRouter.get('/platform-stats', userDashboardController.getPlatformStats);
+
 export default homeDashboardRouter;

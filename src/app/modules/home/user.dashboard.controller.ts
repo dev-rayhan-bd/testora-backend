@@ -57,12 +57,23 @@ const getWeakTopics = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 
+const getPlatformStats = asyncHandler(async (req: Request, res: Response) => {
+    const result = await userDashboardService.getPlatformStats();
+    sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: 'Platform stats fetched successfully',
+        data: result,
+    });
+});
+
 
 export const userDashboardController = {
     getExamReadiness,
     getInProgressSessions,
     getRecentActivity,
     getSubscriptionPlan,
-    getWeakTopics
+    getWeakTopics,
+    getPlatformStats
 };
 
