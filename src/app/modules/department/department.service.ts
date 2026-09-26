@@ -45,7 +45,7 @@ const createDepartmentUnderFaculty = async (payload: TCreateDepartmentPayload, f
 
 
 const getAllDepartmentByfaculty = async (user: IUser, faculty: string) => {
-    const result = await Department.find({ facultyId: new mongoose.Types.ObjectId(faculty) });
+    const result = await Department.find({ faculty: new mongoose.Types.ObjectId(faculty), isActive: true });
 
     const formattedResult = result.map(department => ({
         departments: department._id,

@@ -37,7 +37,7 @@ const createFaculty = async (payload: TCreateFacultyPayload) => {
 const getAllFaculties = async (user:IUser) => {
     console.log(user)
     console.log(user.language, user.email)
-    const result = await Faculty.find({}).lean();
+    const result = await Faculty.find({ isActive: true }).lean();
     console.log({result})
     const formattedResult = result.map(faculty => ({
         faculty: faculty._id,

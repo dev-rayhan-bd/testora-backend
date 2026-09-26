@@ -7,6 +7,7 @@ import { sendVerificationOtp } from '../auth/auth.utils';
 import { USER_ROLE, USER_STATUS } from './user.constant';
 import { IUser, TProfileImage } from './user.interface';
 import User from './user.model';
+import Faculty from '../faculty/faculty.model';
 import { TRegistrationPayload, TUserLanguagePayload, TUserProfileUpdatePayload } from './user.validations';
 
 // create account
@@ -158,10 +159,16 @@ const getUserProfile = async (user: IUser) => {
 }
 
 
-const choosePlan = async (user: IUser, payload: { plan: string, faculty: string }) => {
+const choosePlan = async (user: IUser, payload: { plan: string, faculty?: string }) => {
   user.plan = payload.plan;
-  if (payload.faculty) {
-    user.faculty = payload.faculty;
+  if (payload.plan === 'provime' && payload.faculty) {
+    const facultyDoc = await Faculty.findById(payload.faculty);
+    if (!facultyDoc) {
+      throw new BadRequestError('Faculty not found with the provided ID.');
+    }
+    user.faculty = facultyDoc.name;
+  } else if (payload.plan !== 'provime') {
+    user.faculty = undefined;
   }
   await user.save();
   return null;

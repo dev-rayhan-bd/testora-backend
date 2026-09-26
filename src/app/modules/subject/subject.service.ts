@@ -124,7 +124,7 @@ const getSubjectsOrDepartmentsByExamType = async (user:IUser) => {
     }
     else if (user.plan === EXAM_TYPES.ENTRANCE_EXAM) {
         const faculty = await Faculty.findOne({ name: user.faculty, examType: user.plan, isActive: true });
-        const departments = await Department.find({ facultyId: faculty?._id, examType: user.plan, isActive: true });
+        const departments = await Department.find({ faculty: faculty?._id, examType: user.plan, isActive: true });
         return departments.map(department => ({
             departmentId: department._id,
             name: department.name,
