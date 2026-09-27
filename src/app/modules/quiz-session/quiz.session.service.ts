@@ -26,11 +26,10 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     testType: "official",
   };
 
-  // 2. Jodi subjects thake ebong tar moddhe elements thake, tokhon query-te add koro
-  if (departments) {
-    const departmentsId = await Department.findOne( { name: departments as string }).select("_id").lean();
-    console.log({departmentsId})
-    testQuery.departments = { $in: [departmentsId] };
+  const dept = query.department || query.departments;
+  if (dept) {
+    const deptIds = Array.isArray(dept) ? dept : [dept];
+    testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
@@ -47,8 +46,8 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     _id: quiz._id,
     title: quiz.title,
     totalQuestions: quiz.totalQuestions,
-    totalSubjects: quiz.subjects.length,
-    totalDepartments: quiz.departments.length || undefined,
+    subjects: quiz.subjects,
+    departments: quiz.departments,
   }));
 
   return {
@@ -76,9 +75,10 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     testType: "additional",
   };
 
-  // 2. Jodi subjects thake ebong tar moddhe elements thake, tokhon query-te add koro
-  if (departments) {
-    testQuery.departments = departments;
+  const dept = query.department || query.departments;
+  if (dept) {
+    const deptIds = Array.isArray(dept) ? dept : [dept];
+    testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
@@ -95,8 +95,8 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     _id: quiz._id,
     title: quiz.title,
     totalQuestions: quiz.totalQuestions,
-    totalSubjects: quiz.subjects.length,
-    totalDepartments: quiz.departments.length || undefined,
+    subjects: quiz.subjects,
+    departments: quiz.departments,
   }));
 
   return {

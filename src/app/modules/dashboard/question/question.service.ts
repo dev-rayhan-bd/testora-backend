@@ -931,7 +931,7 @@ const createQuestion = async (payload: any, files?: any) => {
     const uploadedImagesMap: Record<string, string> = {};
     if (files?.question_image) {
         const imageFiles = Array.isArray(files.question_image) ? files.question_image : [files.question_image];
-        
+
         // Upload all images concurrently
         const uploadPromises = imageFiles.map(async (file: any) => {
             const uploaded = await uploadToCloudinary(file, "question_images");
