@@ -8,7 +8,7 @@ const createOrUpdatePageSchema = z.object({
         if (typeof issue.input !== 'string') return 'Content Type must be a string';
       },
   }),
-  title: z.string().min(3, 'Title must be at least 3 characters long'),
+  title: z.string().min(3, 'Title must be at least 3 characters long').optional(),
   content: z.string().min(10, 'Content must be at least 10 characters long'),
 });
 
