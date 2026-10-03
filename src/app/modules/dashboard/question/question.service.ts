@@ -17,6 +17,40 @@ import { TCreatePassagePayload, TQuestionListInput, TTestListInput } from "./que
 
 
 
+const syncTestSubjects = async (testIds: string[]) => {
+    for (const testId of testIds) {
+        if (!mongoose.isValidObjectId(testId)) continue;
+        const test = await Test.findById(testId);
+        if (!test) continue;
+
+        const questions = await Question.find({ testIds: testId }).lean();
+        
+        const subjects = new Set<string>();
+        const mandatorySubjects = new Set<string>();
+        const electiveSubjects = new Set<string>();
+
+        questions.forEach(q => {
+            if (q.subject) {
+                const subStr = q.subject.toString();
+                subjects.add(subStr);
+                
+                if (q.isMandatory === true) {
+                    mandatorySubjects.add(subStr);
+                } else if (q.isMandatory === false) {
+                    electiveSubjects.add(subStr);
+                }
+            }
+        });
+
+        test.subjects = Array.from(subjects).map(id => new Types.ObjectId(id));
+        test.mandatorySubjects = Array.from(mandatorySubjects).map(id => new Types.ObjectId(id));
+        test.electiveSubjects = Array.from(electiveSubjects).map(id => new Types.ObjectId(id));
+        test.totalQuestions = questions.length;
+        
+        await test.save();
+    }
+};
+
 // get question overview 
 const getQuestionOverview = async () => {
     const [
@@ -225,6 +259,7 @@ const getAllQuestions = async (input: TQuestionListInput) => {
                             difficultyLevel: 1,
                             status: 1,
                             createdAt: 1,
+                            isMandatory: 1,
                             subject: {
                                 $cond: {
                                     if: { $ifNull: ["$subjectDetails", false] },
@@ -286,8 +321,11 @@ const getAllQuestions = async (input: TQuestionListInput) => {
         difficultyLevel: item.difficultyLevel,
         status: item.status,
         createdAt: item.createdAt,
+        isMandatory: item.isMandatory ?? false,
         subjectName: item.subject?.name ?? null,
+        subjectNameEn: item.subject?.nameInEnglish ?? null,
         facultyName: item.faculty?.name ?? null,
+        facultyNameEn: item.faculty?.nameInEnglish ?? null,
         passageCode: item.passage?.passageCode ?? null,
     })) || [];
 
@@ -376,6 +414,7 @@ const getQuestionById = async (id: string) => {
                 difficultyLevel: 1,
                 access: 1,
                 status: 1,
+                isMandatory: 1,
                 testIds: {
                     $map: {
                         input: "$testDetails",
@@ -944,13 +983,32 @@ const createQuestion = async (payload: any, files?: any) => {
 
     const testIdsToUpdate = new Set<string>();
 
-    const questionsToInsert = questionsPayload.map((qPayload, index) => {
+    const questionsToInsert = await Promise.all(questionsPayload.map(async (qPayload, index) => {
         let options = qPayload.options;
         if (typeof options === "string") {
             try {
                 options = JSON.parse(options);
             } catch (e) {
                 throw new BadRequestError(`Invalid options JSON format at index ${index}`);
+            }
+        }
+
+        if (!isBulk && Array.isArray(options)) {
+            const optionKeys = ["option_a_image", "option_b_image", "option_c_image", "option_d_image"];
+            for (let i = 0; i < options.length; i++) {
+                if (i < 4 && files?.[optionKeys[i]]?.[0]) {
+                    const uploaded = await uploadToCloudinary(files[optionKeys[i]][0], "question_images");
+                    options[i].imageUrl = uploaded.secure_url;
+                }
+            }
+        }
+
+        if (Array.isArray(options)) {
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                if (!opt.text?.trim() && !opt.imageUrl) {
+                    throw new BadRequestError(`Option ${String.fromCharCode(65 + i)} must have either text or an image`);
+                }
             }
         }
 
@@ -1006,15 +1064,12 @@ const createQuestion = async (payload: any, files?: any) => {
         }
 
         return questionData;
-    });
+    }));
 
     const createdQuestions = await Question.insertMany(questionsToInsert);
 
     if (testIdsToUpdate.size > 0) {
-        await Test.updateMany(
-            { _id: { $in: Array.from(testIdsToUpdate) } },
-            { $inc: { totalQuestions: createdQuestions.length } }
-        );
+        await syncTestSubjects(Array.from(testIdsToUpdate));
     }
 
     return isBulk ? createdQuestions : createdQuestions[0];
@@ -1038,6 +1093,24 @@ const updateQuestion = async (questionId: string, payload: any, files?: any) => 
             options = JSON.parse(options);
         } catch (e) {
             throw new BadRequestError("Invalid options JSON format");
+        }
+    }
+
+    if (Array.isArray(options)) {
+        const optionKeys = ["option_a_image", "option_b_image", "option_c_image", "option_d_image"];
+        for (let i = 0; i < options.length; i++) {
+            if (i < 4 && files?.[optionKeys[i]]?.[0]) {
+                const uploaded = await uploadToCloudinary(files[optionKeys[i]][0], "question_images");
+                options[i].imageUrl = uploaded.secure_url;
+            } else if (question.options[i] && question.options[i].imageUrl && options[i].imageUrl === undefined) {
+                // preserve old image if not explicitly replaced or removed
+                options[i].imageUrl = question.options[i].imageUrl;
+            }
+
+            const opt = options[i];
+            if (!opt.text?.trim() && !opt.imageUrl) {
+                throw new BadRequestError(`Option ${String.fromCharCode(65 + i)} must have either text or an image`);
+            }
         }
     }
 
@@ -1076,6 +1149,10 @@ const updateQuestion = async (questionId: string, payload: any, files?: any) => 
         new: true,
         runValidators: true,
     });
+
+    if (updatedQuestion?.testIds && updatedQuestion.testIds.length > 0) {
+        await syncTestSubjects(updatedQuestion.testIds.map((id: any) => id.toString()));
+    }
 
     return updatedQuestion;
 };
@@ -1140,15 +1217,12 @@ const permanentDeleteQuestion = async (questionId: string) => {
         throw new NotFoundError("Question not found");
     }
 
-    // Decrement test counts if attached
-    if (question.testIds && question.testIds.length > 0) {
-        await Test.updateMany(
-            { _id: { $in: question.testIds } },
-            { $inc: { totalQuestions: -1 } }
-        );
-    }
-
+    const testIdsToSync = question.testIds ? question.testIds.map((id: any) => id.toString()) : [];
     await Question.findByIdAndDelete(questionId);
+
+    if (testIdsToSync.length > 0) {
+        await syncTestSubjects(testIdsToSync);
+    }
 
     return { message: "Question permanently deleted successfully" };
 };
@@ -1167,11 +1241,11 @@ const bulkPermanentDeleteQuestions = async (questionIds: string[]) => {
         });
     });
 
-    for (const [testId, count] of Object.entries(testCounts)) {
-        await Test.findByIdAndUpdate(testId, { $inc: { totalQuestions: -count } });
-    }
-
     const result = await Question.deleteMany({ _id: { $in: questionIds } });
+
+    if (Object.keys(testCounts).length > 0) {
+        await syncTestSubjects(Object.keys(testCounts));
+    }
 
     return {
         message: `Successfully permanently deleted ${result.deletedCount} questions`,
@@ -1388,8 +1462,8 @@ const updateTest = async (testId: string, payload: any) => {
             { _id: { $in: payload.questionIds } },
             { $addToSet: { testIds: testId } }
         );
-        updated!.totalQuestions = payload.questionIds.length;
-        await updated!.save();
+        await syncTestSubjects([testId]);
+        return await Test.findById(testId);
     }
 
     return updated;
