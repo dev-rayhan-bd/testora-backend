@@ -7,8 +7,6 @@ logs/
 *.log.*
 
 # Environment files
-.env
-.env.*
 
 # Build output
 dist/
@@ -37,3 +35,4 @@ coverage/
 branch_structure.json
 .gitignore
 .vercel
+config.bat

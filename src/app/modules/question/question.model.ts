@@ -6,7 +6,7 @@ import { IOption, IQuestion } from "./question.interface";
 
 
 const OptionSchema = new Schema<IOption>({
-    text: { type: String, required: true },
+    text: { type: String, default: "" },
     imageUrl: { type: String },
 });
 

@@ -234,7 +234,7 @@ export const updatePassageSchema = z.object({
 });
 
 const questionOptionSchema = z.object({
-  text: z.string({ message: "Option text is required" }).min(1, { message: "Option text cannot be empty" }),
+  text: z.string({ message: "Option text is required" }).optional().default(""),
   imageUrl: z.string().optional(),
 });
 
@@ -260,6 +260,7 @@ export const createDashboardQuestionSchema = z.object({
   departments: z.array(z.string()).optional(),
   passage: z.string().optional(),
   testIds: z.array(z.string()).optional(),
+  isMandatory: z.coerce.boolean().optional(),
 });
 
 export const updateDashboardQuestionSchema = createDashboardQuestionSchema.partial();

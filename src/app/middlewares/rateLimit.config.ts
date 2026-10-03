@@ -11,7 +11,13 @@ type RequestCount = {
 
 const requestCounts: Record<string, RequestCount> = {};
 
-const trustedIPs = ['192.168.12.31', '192.168.12.37'];
+const trustedIPs = [
+  '192.168.12.31',
+  '192.168.12.37',
+  '::1',           // localhost IPv6
+  '127.0.0.1',     // localhost IPv4
+  '::ffff:127.0.0.1', // IPv4-mapped IPv6 localhost
+];
 
 export const applyRateLimit = () =>
   rateLimit({
