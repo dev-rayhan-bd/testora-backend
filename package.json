@@ -37,6 +37,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
     "node-cron": "^3.0.0",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^8.0.5",
     "pm2": "^6.0.6",
     "save": "^2.9.0",
@@ -44,13 +45,13 @@
     "slugify": "^1.6.8",
     "socket.io": "^4.8.1",
     "stripe": "^22.1.0",
+    "typescript": "^6.0.3",
     "uuid": "^14.0.0",
     "validator": "^13.15.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xlsx": "^0.18.5",
-    "zod": "^4.1.11",
-    "typescript": "^6.0.3"
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
