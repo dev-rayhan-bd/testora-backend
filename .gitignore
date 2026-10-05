@@ -36,3 +36,5 @@ branch_structure.json
 .gitignore
 .vercel
 .env
+temp_auto_push.bat
+temp_interactive_push.bat
