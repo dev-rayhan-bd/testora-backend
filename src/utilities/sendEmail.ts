@@ -15,11 +15,16 @@ interface MailOptions {
 const sendMail = async ({ from, to, subject, html }: MailOptions): Promise<boolean> => {
   try {
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: config.gmail_app_user,
         pass: config.gmail_app_password,
       },
+      tls: {
+        rejectUnauthorized: false
+      }
     });
 
     const mailOptions: SendMailOptions = {
@@ -29,19 +34,11 @@ const sendMail = async ({ from, to, subject, html }: MailOptions): Promise<boole
       html,
     };
 
-
-      try {
-        await transporter.sendMail(mailOptions);
-        console.log(`Email sent to ${to}`);
-      } catch (err) {
-        console.error(`Email failed for ${to}:`, err);
-      }
-
-
-    // Wait for the sendMail operation to complete
-    // const info: SentMessageInfo = await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${to}`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`Email failed for ${to}:`, error.message || error);
     throw new BadRequestError('Failed to send mail!');
   }
 };
