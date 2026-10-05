@@ -256,6 +256,8 @@ const getAllQuestions = async (input: TQuestionListInput) => {
                             access: 1,
                             options: 1,
                             correctOptionIndex: 1,
+                            explanation: 1,
+                            explanationImageUrl: 1,
                             difficultyLevel: 1,
                             status: 1,
                             createdAt: 1,
@@ -411,6 +413,7 @@ const getQuestionById = async (id: string) => {
                 options: 1,
                 correctOptionIndex: 1,
                 explanation: { $ifNull: ["$explanation", null] },
+                explanationImageUrl: { $ifNull: ["$explanationImageUrl", null] },
                 difficultyLevel: 1,
                 access: 1,
                 status: 1,
@@ -545,6 +548,7 @@ const getQuestionById = async (id: string) => {
         options: question.options,
         correctOptionIndex: question.correctOptionIndex,
         explanation: question.explanation,
+        explanationImageUrl: question.explanationImageUrl,
         difficultyLevel: question.difficultyLevel,
         access: question.access,
         status: question.status,
@@ -1032,11 +1036,18 @@ const createQuestion = async (payload: any, files?: any) => {
             questionImageUrl = qPayload.questionImageUrl;
         }
 
+        let explanationImageUrl = qPayload.explanationImageUrl || null;
+        if (!isBulk && files?.explanation_image?.[0] && files.explanation_image[0].size > 0) {
+            const uploadedExp = await uploadToCloudinary(files.explanation_image[0], "question_images");
+            explanationImageUrl = uploadedExp.secure_url;
+        }
+
         const questionData: any = {
             ...qPayload,
             options,
             departments,
             questionImageUrl,
+            explanationImageUrl,
             correctOptionIndex: Number(qPayload.correctOptionIndex) || 0,
             year: Number(qPayload.year) || undefined,
         };
@@ -1123,11 +1134,18 @@ const updateQuestion = async (questionId: string, payload: any, files?: any) => 
         }
     }
 
+    let explanationImageUrl = payload.explanationImageUrl !== undefined ? payload.explanationImageUrl : question.explanationImageUrl;
+    if (files?.explanation_image?.[0] && files.explanation_image[0].size > 0) {
+        const uploadedExp = await uploadToCloudinary(files.explanation_image[0], "question_images");
+        explanationImageUrl = uploadedExp.secure_url;
+    }
+
     const updateData: any = {
         ...payload,
         options,
         departments,
         questionImageUrl,
+        explanationImageUrl,
     };
 
     if (payload.year) updateData.year = Number(payload.year);

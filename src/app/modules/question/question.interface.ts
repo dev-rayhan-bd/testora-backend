@@ -14,6 +14,7 @@ export interface QuestionFiles {
     option_b_image?: Express.Multer.File[];
     option_c_image?: Express.Multer.File[];
     option_d_image?: Express.Multer.File[];
+    explanation_image?: Express.Multer.File[];
 }
 
 
@@ -31,6 +32,7 @@ export interface IQuestion extends Document {
     options: IOption[];
     correctOptionIndex: number;
     explanation?: string;
+    explanationImageUrl?: string;
     status: TQuestionStatus;
     testIds: Types.ObjectId[];
     isActive: boolean;

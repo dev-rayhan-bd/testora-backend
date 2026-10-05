@@ -95,6 +95,7 @@ export const createQuestionSchema = z
       .int({ message: "Correct option index must be an integer" })
       .min(0, { message: "Correct option index must be 0 or greater" }),
     explanation: z.string({ message: "Explanation must be a string" }).optional(),
+    explanationImageUrl: z.string().optional(),
     status: z.enum(["draft", "published"], {
       message: "Status must be draft or published",
     }).default("draft"),
@@ -203,6 +204,7 @@ const updateQuestionSchema = z
       .min(0, { message: "Correct option index must be 0 or greater" })
       .optional(),
     explanation: z.string({ message: "Explanation must be a string" }).optional(),
+    explanationImageUrl: z.string().optional(),
     status: z.enum(["draft", "published"], {
       message: "Status must be draft or published",
     }).optional(),

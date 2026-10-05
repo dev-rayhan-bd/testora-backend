@@ -243,6 +243,7 @@ export type NormalizedImportRow = {
     options: { text: string; imageUrl?: string }[];
     correctOptionIndex: number;
     explanation?: string;
+    explanationImageUrl?: string;
     difficultyLevel?: string;
     status?: string;
     faculty?: string;
@@ -457,12 +458,13 @@ export const normalizeImportRow = (row: Record<string, unknown>): NormalizedImpo
             .filter((option): option is { text: string; imageUrl: string | undefined } => option !== null),
         correctOptionIndex: Number(getRowValue(row, "correctoptionindex") ?? 0),
         explanation: getRowValue(row, "explanation"),
+        explanationImageUrl: getRowValue(row, "explanationimageurl"),
         status: getRowValue(row, "status"),
         isMandatory: parseBooleanCell(getRowValue(row, "ismandatory")),
         faculty: getRowValue(row, "faculty"),
         departments: getRowValuesByPrefix(row, "department"),
         subject: getRowValue(row, "subject"),
-        passage: getRowValue(row, "passage"),
+        passage: getRowValue(row, ["passage", "passagecode"]),
     };
 };
 
@@ -827,7 +829,7 @@ export const buildEntranceExamContext = async (
         hasError = true;
     }
 
-    const passageId = row.passage ? await resolveDocumentId(Passage, row.passage, { faculty: facultyId }) : null;
+    const passageId = row.passage ? await resolveDocumentId(Passage, row.passage) : null;
     if (row.passage && !passageId) {
         issues.push({
             row: rowNumber,
@@ -1059,6 +1061,7 @@ export const upsertTestAndQuestions = async ({
             access: row.access,
             correctOptionIndex: row.correctOptionIndex,
             explanation: row.explanation,
+            explanationImageUrl: row.explanationImageUrl,
             difficultyLevel: row.difficultyLevel,
             status: row.status,
             isMandatory: row.isMandatory,
