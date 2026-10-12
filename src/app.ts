@@ -19,7 +19,7 @@ import { stripeWebhookHandler } from './webhook/stripe.webhook';
 const app: Application = express();
 
 app.post('/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
-// global middlewares
+// global middlewaress
 
 app.use(express.static(path.resolve('./src/public')));
 
