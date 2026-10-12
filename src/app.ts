@@ -45,7 +45,9 @@ app.use(
       'https://testora-dashboard-alpha.vercel.app',
       'http://13.50.88.233:3000',
       'http://13.50.88.233:3001', 
-      'http://13.50.88.233:3002' 
+      'http://13.50.88.233:3002',
+      'http://13.50.88.233',
+      
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
