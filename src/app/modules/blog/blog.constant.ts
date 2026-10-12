@@ -2,6 +2,7 @@
 export const BLOG_STATUS = {
     DRAFT: 'draft',
     PUBLISHED: 'published',
+    HIDDEN: 'hidden',
 } as const;
 
 

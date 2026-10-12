@@ -1,7 +1,8 @@
-import { Document } from "mongoose";
+import { Types } from "mongoose";
 import { TExamTypes } from "../../../interfaces";
 
-export interface ISubject extends Document {
+export interface ISubject {
+    _id?: Types.ObjectId;
     name: string;
     nameInEnglish: string;
     nameInAlbanian: string;
@@ -9,6 +10,6 @@ export interface ISubject extends Document {
     examType: TExamTypes;
     isElective: boolean;
     isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

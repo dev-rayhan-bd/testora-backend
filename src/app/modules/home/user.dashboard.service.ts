@@ -4,7 +4,7 @@ import { IUser } from "../user/user.interface";
 import Question from "../question/question.model";
 import Test from "../test/test.model";
 import Subject from "../subject/subject.model";
-import { EXAM_TYPES } from "../../../interfaces";
+import { EXAM_TYPES, TExamTypes } from "../../../interfaces";
 
 const getExamReadiness = async (user: IUser) => {
     const sevenDaysAgo = new Date();
@@ -12,7 +12,7 @@ const getExamReadiness = async (user: IUser) => {
 
     const sessions = await QuizSession.find({
         user: user._id,
-        examType: user.plan,
+        examType: user.plan as TExamTypes,
         status: QUIZ_STATUS.COMPLETED,
         completedAt: { $gte: sevenDaysAgo },
     }).select("correctCount totalQuestions completedAt");
@@ -25,8 +25,8 @@ const getExamReadiness = async (user: IUser) => {
         };
     }
 
-    const totalCorrect = sessions.reduce((sum, s) => sum + s.correctCount, 0);
-    const totalQuestions = sessions.reduce((sum, s) => sum + s.totalQuestions, 0);
+    const totalCorrect = (sessions as any[]).reduce((sum, s) => sum + s.correctCount, 0);
+    const totalQuestions = (sessions as any[]).reduce((sum, s) => sum + s.totalQuestions, 0);
     const readinessPercent = Math.round((totalCorrect / totalQuestions) * 100);
 
     return {
@@ -143,7 +143,7 @@ const getInProgressSessions = async (user: IUser) => {
     const now = new Date();
     const sessions = await QuizSession.find({
         user: user._id,
-        examType: user.plan,
+        examType: user.plan as TExamTypes,
         status: { $in: [QUIZ_STATUS.IN_PROGRESS] },
     })
         .select("examType subjectIds durationSeconds startedAt currentIndex totalQuestions status")
@@ -154,7 +154,7 @@ const getInProgressSessions = async (user: IUser) => {
 
         console.log({sessions});
 
-    const result = sessions.map((s) => {
+    const result = (sessions as any[]).map((s) => {
         // wall clock remaining
         const expireAt = new Date(s.startedAt).getTime() + s.durationSeconds * 1000;
         const remainingSeconds = Math.max(0, (expireAt - now.getTime()) / 1000);
@@ -189,7 +189,7 @@ const getInProgressSessions = async (user: IUser) => {
 const getRecentActivity = async (user: IUser) => {
   const sessions = await QuizSession.find({
     user:     user._id,
-    examType: user.plan,
+    examType: user.plan as TExamTypes,
     status:   QUIZ_STATUS.COMPLETED,
   })
     .select("subjectIds correctCount totalQuestions completedAt")
@@ -199,7 +199,7 @@ const getRecentActivity = async (user: IUser) => {
     .lean();
  
   const now    = new Date();
-  const result = sessions.map((s) => {
+  const result = (sessions as any[]).map((s) => {
     const scorePercent = Math.round(
       (s.correctCount / s.totalQuestions) * 100
     );

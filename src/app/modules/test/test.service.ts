@@ -157,14 +157,14 @@ const importTestsFromCsvFile = async (fileBuffer: Buffer) => {
         {
           title: testName,
           testCode,
-          examType: firstRow.examType,
+          examType: firstRow.examType as TExamTypes,
           year: firstRow.year,
           subjects: [...new Set(resolvedContexts.map(item => item.subject.toString()))].map(id => new Types.ObjectId(id)),
-          testType: firstRow.testType,
+          testType: firstRow.testType as TTestTypes,
           access: firstRow.access,
           totalQuestions: 0,
           ...resolvedContexts[0],
-        },
+        } as any,
       ],
       { session }
     ))[0];
@@ -175,15 +175,15 @@ const importTestsFromCsvFile = async (fileBuffer: Buffer) => {
 
     const orConditions = parsedRows.map((r) => ({
       questionText: r.questionText.trim(),
-      examType: r.examType,
+      examType: r.examType as TExamTypes,
       year: r.year,
     }));
 
     const existingQuestions =
-      orConditions.length > 0 ? await Question.find({ $or: orConditions }).session(session) : [];
+      orConditions.length > 0 ? await Question.find({ $or: orConditions as any }).session(session) : [];
 
-    const existingMap = new Map<string, typeof existingQuestions[0]>();
-    for (const q of existingQuestions) {
+    const existingMap = new Map<string, any>();
+    for (const q of existingQuestions as any[]) {
       const k = `${q.questionText.trim()}||${q.examType}||${q.year}`;
       existingMap.set(k, q);
     }
@@ -195,8 +195,8 @@ const importTestsFromCsvFile = async (fileBuffer: Buffer) => {
       const existing = existingMap.get(key);
       if (existing) {
         // If existing question already linked to this test, skip; otherwise mark to link.
-        const linked = existing.testIds?.map((id: any) => id.toString()).includes(createdTest._id.toString());
-        if (!linked) toLinkExistingIds.push(existing._id.toString());
+        const linked = (existing as any).testIds?.map((id: any) => id.toString()).includes((createdTest as any)._id.toString());
+        if (!linked) toLinkExistingIds.push((existing as any)._id.toString());
       } else {
         toCreateRows.push({ row: r, index: idx });
       }

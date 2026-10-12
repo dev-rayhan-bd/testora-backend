@@ -1,3 +1,4 @@
+import { TContent } from './content.constant';
 import { TContentPayload } from './content.interface';
 import { Content } from './content.model';
 
@@ -20,7 +21,7 @@ const createOrUpdatePage = async (payload: TContentPayload) => {
 };
 
 const getContentByType = async (type: string) => {
-  const page = await Content.findOne({ type });
+  const page = await Content.findOne({ type: type as TContent });
   return page;
 };
 

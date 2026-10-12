@@ -46,7 +46,7 @@ async function seedMoreData() {
   for (const b of blogs) {
     const existing = await Blog.findOne({ title: b.title });
     if (!existing) {
-      await Blog.create(b);
+      await Blog.create(b as any);
       console.log(`Blog created: ${b.title}`);
     } else {
       console.log(`Blog already exists: ${b.title}`);

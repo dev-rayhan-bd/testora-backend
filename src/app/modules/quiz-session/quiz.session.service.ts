@@ -1,5 +1,6 @@
 
 import { Types } from "mongoose";
+import { TExamTypes } from "../../../interfaces";
 import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
 import Question from "../question/question.model";
 import Subscription from "../subscription/subscription.model";
@@ -257,7 +258,7 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
 
   const session = await QuizSession.create({
     user: user._id,
-    examType: user.plan,
+    examType: user.plan as TExamTypes,
     questionIds,
     totalQuestions,
     durationSeconds,
@@ -272,7 +273,7 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
   });
 
   return {
-    sessionId: session._id,
+    sessionId: (session as any)._id,
     totalQuestions,
     durationSeconds,
     remainingSeconds: durationSeconds,
@@ -439,7 +440,7 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 
   const session = await QuizSession.create({
     user: user._id,
-    examType: user.plan,
+    examType: user.plan as TExamTypes,
     subjectIds: subjectIds.map((id: string) => new Types.ObjectId(id)),
     ...(facultyId && { faculty: new Types.ObjectId(facultyId) }),
     ...(departmentIds?.length && { departmentIds: departmentIds.map((id: string) => new Types.ObjectId(id)) }),
@@ -458,7 +459,7 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
   });
 
   return {
-    sessionId: session._id,
+    sessionId: (session as any)._id,
     totalQuestions,
     durationSeconds,
     remainingSeconds: durationSeconds,

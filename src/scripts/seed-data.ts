@@ -50,9 +50,9 @@ async function seed() {
 
   for (const s of allToSeed) {
     const slug = slugify(`${s.name}-${s.examType}`, { lower: true, strict: true });
-    let existing = await Subject.findOne({ slug });
+    let existing: any = await Subject.findOne({ slug });
     if (!existing) {
-      existing = await Subject.findOne({ name: s.name, examType: s.examType });
+      existing = await Subject.findOne({ name: s.name, examType: s.examType as any });
     }
 
     if (!existing) {
@@ -60,7 +60,7 @@ async function seed() {
         ...s,
         slug,
         isActive: true,
-      });
+      } as any);
       console.log(`+ Created subject: ${s.name} (${s.examType})`);
     } else {
       console.log(`= Already exists: ${s.name} (${s.examType})`);

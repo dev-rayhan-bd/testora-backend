@@ -11,7 +11,8 @@ export interface IQuestionAttempt {
   answeredAt: Date;
 }
 
-export interface IQuizSession extends Document {
+export interface IQuizSession {
+  _id?: Types.ObjectId;
   user: Types.ObjectId;
   examType: TExamTypes;
   subjectIds: Types.ObjectId[];
@@ -42,6 +43,6 @@ export interface IQuizSession extends Document {
 
   startedAt: Date;
   completedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

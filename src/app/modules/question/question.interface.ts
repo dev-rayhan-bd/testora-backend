@@ -18,7 +18,8 @@ export interface QuestionFiles {
 }
 
 
-export interface IQuestion extends Document {
+export interface IQuestion {
+    _id?: Types.ObjectId;
     examType: TExamTypes;
     year: number;
     subject?: Types.ObjectId;
@@ -36,6 +37,6 @@ export interface IQuestion extends Document {
     status: TQuestionStatus;
     testIds: Types.ObjectId[];
     isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
 } 

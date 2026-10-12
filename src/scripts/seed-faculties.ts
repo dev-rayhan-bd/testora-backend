@@ -16,20 +16,20 @@ const facultiesData = [
     name: "Fakulteti i Inxhinierisë dhe IT",
     nameInEnglish: "Faculty of Engineering and IT",
     nameInAlbanian: "Fakulteti i Inxhinierisë dhe IT",
-    examType: "entrance_exam",
+    examType: "provime" as const,
     departments: [
       {
         name: "Inxhinieri Softuerike",
         nameInEnglish: "Software Engineering",
         nameInAlbanian: "Inxhinieri Softuerike",
-        examType: "entrance_exam",
+        examType: "provime" as const,
         subjects: ["Matematikë e Avancuar", "Bazat e Programimit"],
       },
       {
         name: "Inxhinieri Kompjuterike",
         nameInEnglish: "Computer Engineering",
         nameInAlbanian: "Inxhinieri Kompjuterike",
-        examType: "entrance_exam",
+        examType: "provime" as const,
         subjects: ["Fizikë Teknike", "Matematikë e Avancuar"],
       }
     ]
@@ -38,13 +38,13 @@ const facultiesData = [
     name: "Fakulteti i Mjekësisë",
     nameInEnglish: "Faculty of Medicine",
     nameInAlbanian: "Fakulteti i Mjekësisë",
-    examType: "entrance_exam",
+    examType: "provime" as const,
     departments: [
       {
         name: "Mjekësi e Përgjithshme",
         nameInEnglish: "General Medicine",
         nameInAlbanian: "Mjekësi e Përgjithshme",
-        examType: "entrance_exam",
+        examType: "provime" as const,
         subjects: [],
       }
     ]
@@ -56,16 +56,16 @@ async function seedFacultiesAndDepartments() {
   await mongoose.connect(MONGODB_URI);
 
   // Get subjects
-  const subjects = await Subject.find({ examType: "entrance_exam" });
+  const subjects = await Subject.find({ examType: "provime" });
   const subjectMap: Record<string, string> = {};
-  for (const sub of subjects) {
+  for (const sub of subjects as any[]) {
     subjectMap[sub.name] = sub._id.toString();
   }
 
   console.log("Seeding Faculties and Departments...");
 
   for (const facData of facultiesData) {
-    let faculty = await Faculty.findOne({ name: facData.name });
+    let faculty: any = await Faculty.findOne({ name: facData.name });
     
     if (!faculty) {
       faculty = await Faculty.create({
@@ -81,7 +81,7 @@ async function seedFacultiesAndDepartments() {
     }
 
     for (const depData of facData.departments) {
-      let department = await Department.findOne({ name: depData.name, faculty: faculty._id });
+      let department: any = await Department.findOne({ name: depData.name, faculty: faculty._id });
       
       const depSubjects = depData.subjects
         .map(subName => subjectMap[subName])

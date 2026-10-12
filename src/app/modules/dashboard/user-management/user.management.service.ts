@@ -1,10 +1,11 @@
+import { TUserRole } from "../../user/user.constant";
 import User from "../../user/user.model";
 import { BadRequestError, NotFoundError } from "../../../errors/request/apiError";
 
 const getUserStats = async () => {
     const baseFilter = {
         deletedAt: null,
-        role: { $nin: ['admin', 'super-admin'] },
+        role: { $nin: ['admin', 'super-admin'] as TUserRole[] },
     };
 
     const [
@@ -16,9 +17,9 @@ const getUserStats = async () => {
     ]);
 
     console.log("Total students/users:", totalUsers);
-    const activeAccountUsers = allUsers.filter((u) => u.status === 'active').length;
-    const blockedAccountUsers = allUsers.filter((u) => u.status === 'blocked').length;
-    const disabledAccountUsers = allUsers.filter((u) => u.status === 'disabled').length;
+    const activeAccountUsers = (allUsers as any[]).filter((u) => u.status === 'active').length;
+    const blockedAccountUsers = (allUsers as any[]).filter((u) => u.status === 'blocked').length;
+    const disabledAccountUsers = (allUsers as any[]).filter((u) => u.status === 'disabled').length;
 
     return {
         totalUsers,

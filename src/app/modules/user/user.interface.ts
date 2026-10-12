@@ -37,8 +37,8 @@ export interface IUser extends Document {
   status: TUserStatus;
   disabledAt: Date | null;
   deletedAt?: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 
   // Instance methods
   isPasswordMatched(plainTextPassword: string): Promise<boolean>;

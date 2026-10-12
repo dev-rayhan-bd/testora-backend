@@ -53,7 +53,7 @@ const createBlog = async (payload: TCreateBlogPayload, files: BlogFiles) => {
     };
 
     // 5. Create blog with proper error handling + cloudinary rollback
-    let result;
+    let result: any;
     try {
         result = await Blog.create(blogData);
     } catch (err) {

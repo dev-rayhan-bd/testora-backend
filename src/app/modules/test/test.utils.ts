@@ -1,7 +1,7 @@
 import csv from "csv-parser";
 import mongoose from "mongoose";
 import { Readable } from "stream";
-import { EXAM_TYPES, TAccessTypes } from "../../../interfaces";
+import { EXAM_TYPES, TAccessTypes, TExamTypes } from "../../../interfaces";
 import { BadRequestError } from "../../errors/request/apiError";
 import Department from "../department/department.model";
 import Faculty from "../faculty/faculty.model";
@@ -133,12 +133,12 @@ export const resolveSubjectId = async (rawValue: string, examType: string) => {
     }
 
     const doc = await Subject.findOne({
-        examType,
+        examType: examType as TExamTypes,
         isActive: true,
         $or: orConditions,
     }).select("_id");
 
-    return doc?._id ?? null;
+    return (doc as any)?._id ?? null;
 };
 
 // Build the question context (faculty, department, subject, passage) based on the exam type and CSV row data.
@@ -303,22 +303,22 @@ export const getPaginatedTestsByType = async (
         Test.countDocuments(query),
     ]);
 
-    const subjectsList = await Subject.find({ _id: { $in: tests.flatMap(test => test.subjects || []) }, examType: input.examType })
+    const subjectsList = await Subject.find({ _id: { $in: tests.flatMap(test => (test as any).subjects || []) }, examType: input.examType as TExamTypes })
         .select("_id name nameInEnglish nameInAlbanian")
         .lean();
 
     console.log({ subjectsList })
 
-    const formattedTests = tests.map((test) => {
+    const formattedTests = tests.map((test: any) => {
 
-    const testSubjectIds = test.subjects?.map(id => id.toString()) || [];
+    const testSubjectIds = test.subjects?.map((id: any) => id.toString()) || [];
 
         return {
             testId: test._id,
             title: test.title,
             totalQuestions: test.totalQuestions,
 
-            subjects: subjectsList
+            subjects: (subjectsList as any[])
                 .filter(subject => testSubjectIds.includes(subject._id.toString()))
                 .map(sub => ({
                     _id: sub._id,

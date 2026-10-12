@@ -124,7 +124,7 @@ async function seedRealData() {
   for (const q of questions) {
     const existing = await Question.findOne({ questionText: q.questionText });
     if (!existing) {
-      await Question.create(q);
+      await Question.create(q as any);
       addedQuestions++;
       console.log(`+ Created Question: ${q.questionText}`);
     } else {

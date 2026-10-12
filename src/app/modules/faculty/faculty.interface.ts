@@ -1,12 +1,13 @@
-import { Document } from "mongoose";
+import { Types } from "mongoose";
 
-export interface IFaculty extends Document {
+export interface IFaculty {
+    _id?: Types.ObjectId;
     name: string;
     nameInEnglish: string;
     nameInAlbanian: string;
     slug: string;
-    examType: "provime"
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    examType: "provime";
+    isActive?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

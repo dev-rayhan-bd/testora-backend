@@ -1,10 +1,12 @@
+import { Types } from "mongoose";
 import { TBlogCategory, TBlogStatus } from "./blog.constant";
 
 export interface BlogFiles {
     blog_image?: Express.Multer.File[];
 }
 
-export interface IBlog extends Document {
+export interface IBlog {
+    _id?: Types.ObjectId;
     title: string;
     slug: string;
     content: string;
@@ -15,6 +17,6 @@ export interface IBlog extends Document {
     status: TBlogStatus;
     views: number;
     publishedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

@@ -13,8 +13,8 @@ async function fix() {
   console.log("Connecting to MongoDB:", MONGODB_URI);
   await mongoose.connect(MONGODB_URI);
 
-  await Faculty.updateMany({ examType: "entrance_exam" }, { examType: "provime" });
-  await Department.updateMany({ examType: "entrance_exam" }, { examType: "provime" });
+  await Faculty.updateMany({ examType: "entrance_exam" as any }, { examType: "provime" });
+  await Department.updateMany({ examType: "entrance_exam" as any }, { examType: "provime" });
 
   console.log("Done updating examTypes");
   mongoose.disconnect();

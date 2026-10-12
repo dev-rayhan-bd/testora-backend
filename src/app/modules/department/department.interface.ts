@@ -1,14 +1,15 @@
-import { Document, Types } from "mongoose";
+import { Types } from "mongoose";
 
-export interface IDepartment extends Document {
+export interface IDepartment {
+    _id?: Types.ObjectId;
     name: string;
     nameInEnglish: string;
     nameInAlbanian: string;
     slug: string;
-    examType: 'provime'
-    subjects: Types.ObjectId[];
+    examType: 'provime';
+    subjects?: Types.ObjectId[];
     faculty: Types.ObjectId;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    isActive?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

@@ -1,6 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import * as XLSX from "xlsx";
-import { EXAM_TYPES, TAccessTypes } from "../../../../interfaces";
+import { EXAM_TYPES, TAccessTypes, TExamTypes, TTestTypes } from "../../../../interfaces";
 import { BadRequestError } from "../../../errors/request/apiError";
 import Department from "../../department/department.model";
 import Faculty from "../../faculty/faculty.model";
@@ -430,8 +430,8 @@ export const resolveSubjectId = async (
         orConditions.unshift({ _id: value });
     }
 
-    const doc = await Subject.findOne({ examType, isActive: true, $or: orConditions }).select("_id");
-    return doc?._id ?? null;
+    const doc = await Subject.findOne({ examType: examType as TExamTypes, isActive: true, $or: orConditions }).select("_id");
+    return (doc as any)?._id ?? null;
 };
 
 /**
@@ -914,14 +914,14 @@ export const enforceAccessConsistency = async (
 
     const orConditions = rows.map(({ row }) => ({
         questionText: row.questionText.trim(),
-        examType: row.examType,
+        examType: row.examType as TExamTypes,
         year: row.year,
     }));
 
-    const existingQuestions = await Question.find({ $or: orConditions }).session(session);
+    const existingQuestions = await Question.find({ $or: orConditions as any }).session(session);
 
-    const existingByKey = new Map<string, (typeof existingQuestions)[number]>();
-    for (const q of existingQuestions) {
+    const existingByKey = new Map<string, any>();
+    for (const q of existingQuestions as any[]) {
         existingByKey.set(`${q.questionText.trim()}||${q.examType}||${q.year}`, q);
     }
 
@@ -1004,17 +1004,17 @@ export const upsertTestAndQuestions = async ({
                     {
                         title: testName,
                         testCode,
-                        examType: firstRow.examType,
+                        examType: firstRow.examType as TExamTypes,
                         year: firstRow.year,
                         subjects: uniqueSubjectIds,
-                        testType: firstRow.testType,
+                        testType: firstRow.testType as TTestTypes,
                         access: firstRow.access,
                         mandatorySubjects,
                         electiveSubjects,
                         totalQuestions: 0,
                         ...toMongooseRefs(rows[0]?.context ?? {}),
                         departments: uniqueDepartmentIds,
-                    },
+                    } as any,
                 ],
                 { session }
             )
@@ -1025,14 +1025,14 @@ export const upsertTestAndQuestions = async ({
 
     const orConditions = rows.map(({ row }) => ({
         questionText: row.questionText.trim(),
-        examType: row.examType,
+        examType: row.examType as TExamTypes,
         year: row.year,
     }));
 
-    const existingQuestions = orConditions.length > 0 ? await Question.find({ $or: orConditions }).session(session) : [];
+    const existingQuestions = orConditions.length > 0 ? await Question.find({ $or: orConditions as any }).session(session) : [];
 
-    const existingByKey = new Map<string, (typeof existingQuestions)[number]>();
-    for (const q of existingQuestions) {
+    const existingByKey = new Map<string, any>();
+    for (const q of existingQuestions as any[]) {
         existingByKey.set(rowKey(q.questionText, q.examType, q.year), q);
     }
 
@@ -1043,8 +1043,8 @@ export const upsertTestAndQuestions = async ({
         const existing = existingByKey.get(rowKey(entry.row.questionText, entry.row.examType, entry.row.year));
 
         if (existing) {
-            const alreadyLinked = existing.testIds?.map((id: any) => id.toString()).includes(createdTest._id.toString());
-            if (!alreadyLinked) toLinkExistingIds.push(existing._id.toString());
+            const alreadyLinked = (existing as any).testIds?.map((id: any) => id.toString()).includes((createdTest as any)._id.toString());
+            if (!alreadyLinked) toLinkExistingIds.push((existing as any)._id.toString());
         } else {
             toCreate.push(entry);
         }
