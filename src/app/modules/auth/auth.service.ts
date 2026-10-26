@@ -221,11 +221,15 @@ const resendEmailVerificationOtpAgain = async (email: string) => {
     throw new BadRequestError('This account is already verified!');
   }
 
-  // If OTP exists in DB, TTL guarantees it's still valid (expired ones are auto-deleted)
+  // Enforce a 60-second cooldown between resends matching the UI countdown timer
   const existingOtp = await OtpToken.findOne({ userId: user._id, type: 'email_verification' });
 
   if (existingOtp) {
-    throw new BadRequestError('Current OTP is still valid. Please wait before requesting a new one.');
+    const elapsedSeconds = (Date.now() - new Date(existingOtp.createdAt).getTime()) / 1000;
+    if (elapsedSeconds < 60) {
+      const waitTime = Math.ceil(60 - elapsedSeconds);
+      throw new BadRequestError(`Please wait ${waitTime} second${waitTime > 1 ? 's' : ''} before requesting a new code.`);
+    }
   }
 
   // Validate config before proceeding
@@ -286,10 +290,15 @@ const forgotPassword = async (email: string) => {
     throw new InternalServerError('OTP expiry configuration is invalid.');
   }
 
-  // If OTP exists in DB, TTL guarantees it's still valid (expired ones are auto-deleted)
+  // Enforce a 60-second cooldown between resends matching UI countdown
   const existingOtp = await OtpToken.findOne({ userId: user._id, type: 'password_reset' });
   if (existingOtp) {
-    throw new BadRequestError('Current OTP is still valid. Please wait before requesting a new one.');
+    const elapsedSeconds = (Date.now() - new Date(existingOtp.createdAt).getTime()) / 1000;
+    if (elapsedSeconds < 60) {
+      const waitTime = Math.ceil(60 - elapsedSeconds);
+      throw new BadRequestError(`Please wait ${waitTime} second${waitTime > 1 ? 's' : ''} before requesting a new code.`);
+    }
+    await OtpToken.deleteOne({ _id: existingOtp._id });
   }
 
   const otp = generateOTP();
@@ -338,10 +347,15 @@ const resetPasswordOtpAgain = async (email: string) => {
     throw new InternalServerError('OTP expiry configuration is invalid.');
   }
 
-  // User never initiated forgot password
+  // Enforce a 60-second cooldown between resends matching UI countdown
   const existingOtp = await OtpToken.findOne({ userId: user._id, type: 'password_reset' });
   if (existingOtp) {
-    throw new BadRequestError('Current OTP is still valid. Please wait before requesting a new one.');
+    const elapsedSeconds = (Date.now() - new Date(existingOtp.createdAt).getTime()) / 1000;
+    if (elapsedSeconds < 60) {
+      const waitTime = Math.ceil(60 - elapsedSeconds);
+      throw new BadRequestError(`Please wait ${waitTime} second${waitTime > 1 ? 's' : ''} before requesting a new code.`);
+    }
+    await OtpToken.deleteOne({ _id: existingOtp._id });
   }
 
   // If no OTP found at all — user never initiated forgot password

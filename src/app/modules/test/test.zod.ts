@@ -15,6 +15,7 @@ const createTestSchema = z.object({
     testType: z.enum([TEST_TYPES.OFFICIAL, TEST_TYPES.ADDITIONAL], { message: "Test type must be official or additional" }),
     access: z.enum([ACCESS_TYPES.FREE, ACCESS_TYPES.PREMIUM], { message: "Access must be free or premium" }).default("free"),
     totalSubjects: z.coerce.number({ message: "Total subjects must be a number" }),
+    durationMinutes: z.coerce.number({ message: "Duration minutes must be a number" }).min(1).optional(),
     faculty: z.string({ message: "Faculty ID must be a string" }).optional(),
     departmentss: z.array(z.string({ message: "Department ID must be a string" })).optional(),
     subjectss: z.array(z.string({ message: "Subject ID must be a string" })).optional(),

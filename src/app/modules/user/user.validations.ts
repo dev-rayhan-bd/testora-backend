@@ -13,7 +13,7 @@ const createAuthSchema = z.object({
     })
     .min(3, 'Full name must be at least 3 characters long')
     .max(30, 'Full name cannot exceed 30 characters')
-    .regex(/^[a-zA-Z\s]+$/, 'Full name can only contain letters and spaces'),
+    .regex(/^[\p{L}\s'-]+$/u, 'Full name can only contain letters, spaces, and hyphens'),
 
 
   email: z
@@ -93,7 +93,7 @@ const updateUserProfileSchema = z.object({
     })
     .min(3, 'Full name must be at least 3 characters long')
     .max(30, 'Full name cannot exceed 30 characters')
-    .regex(/^[a-zA-Z\s]+$/, 'Full name can only contain letters and spaces').optional(),
+    .regex(/^[\p{L}\s'-]+$/u, 'Full name can only contain letters, spaces, and hyphens').optional(),
 
   city: z.string({
     error: (issue) => {
@@ -102,7 +102,7 @@ const updateUserProfileSchema = z.object({
       return 'Invalid city format';
     },
   })
-    .regex(/^[a-zA-Z\s]+$/, "City can only contain letters and spaces").optional(),
+    .regex(/^[\p{L}\s'-]+$/u, "City can only contain letters, spaces, and hyphens").optional(),
 
 });
 

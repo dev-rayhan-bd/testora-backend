@@ -19,7 +19,8 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
 
   const question = await Question.findById(questionId)
     .select("-correctOptionIndex -explanation -status -isActive -createdAt -updatedAt")
-    .populate("passage", "title content passageImageUrl passageCode");
+    .populate("passage", "title content passageImageUrl passageCode")
+    .populate("subject", "name nameInEnglish nameInAlbanian slug");
   if (!question) throw new NotFoundError("Question not found.");
 
   const existingAttempt = session.attempts.find(
@@ -78,6 +79,13 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
     questionId: question._id,
     questionText: question.questionText,
     questionImage: question.questionImageUrl ?? null,
+    subject: question.subject ? {
+      _id: (question.subject as any)._id,
+      name: (question.subject as any).name,
+      nameInEnglish: (question.subject as any).nameInEnglish,
+      nameInAlbanian: (question.subject as any).nameInAlbanian,
+      slug: (question.subject as any).slug,
+    } : null,
     options: question.options,
     passage: passageData,
     selectedOptionIndex: existingAttempt?.selectedOptionIndex ?? null,

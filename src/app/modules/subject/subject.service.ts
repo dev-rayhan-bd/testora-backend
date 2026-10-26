@@ -18,6 +18,7 @@ const createSubject = async (payload: any) => {
     const isExist = await Subject.findOne({
         name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
         examType: payload.examType,
+        isActive: true,
     });
 
     if (isExist) {
@@ -26,6 +27,24 @@ const createSubject = async (payload: any) => {
         );
     }
     const generatedSlug = slugify(payload.name, { lower: true, strict: true });
+
+    // If an inactive subject with the same name exists, restore/update it
+    const inactiveSubject = await Subject.findOne({
+        name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+        examType: payload.examType,
+        isActive: false,
+    });
+
+    if (inactiveSubject) {
+        inactiveSubject.name = payload.name;
+        inactiveSubject.nameInEnglish = payload.nameInEnglish || payload.name;
+        inactiveSubject.nameInAlbanian = payload.nameInAlbanian || payload.name;
+        inactiveSubject.isElective = payload.isElective ?? false;
+        inactiveSubject.slug = generatedSlug;
+        inactiveSubject.isActive = true;
+        await inactiveSubject.save();
+        return inactiveSubject;
+    }
 
     const subjectData = {
         ...payload,
@@ -86,6 +105,7 @@ const updateSubject = async (id: string, payload: any) => {
             name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
             examType: payload.examType || subject.examType,
             _id: { $ne: id },
+            isActive: true,
         });
         if (isExist) {
             throw new BadRequestError(`Subject name "${payload.name}" already exists!`);

@@ -19,6 +19,7 @@ const createDepartmentUnderFaculty = async (payload: TCreateDepartmentPayload, f
     const isExist = await Department.findOne({
         name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
         faculty,
+        isActive: true,
     });
 
     if (isExist) {
@@ -27,6 +28,28 @@ const createDepartmentUnderFaculty = async (payload: TCreateDepartmentPayload, f
         );
     }
     const generatedSlug = slugify(payload.name, { lower: true, strict: true });
+
+    // If an inactive department with the same name exists under this faculty, restore/update it
+    const inactiveDept = await Department.findOne({
+        name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+        faculty,
+        isActive: false,
+    });
+
+    if (inactiveDept) {
+        inactiveDept.name = payload.name;
+        inactiveDept.nameInEnglish = payload.nameInEnglish || payload.name;
+        inactiveDept.nameInAlbanian = payload.nameInAlbanian || payload.name;
+        inactiveDept.slug = generatedSlug;
+        inactiveDept.isActive = true;
+        await inactiveDept.save();
+        return {
+            departments: inactiveDept._id,
+            name: inactiveDept.name,
+            slug: inactiveDept.slug,
+            faculty: inactiveDept.faculty,
+        };
+    }
 
     const departmentData = {
         ...payload,
@@ -83,6 +106,7 @@ const updateDepartment = async (id: string, payload: any) => {
             name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
             faculty: department.faculty,
             _id: { $ne: id },
+            isActive: true,
         });
         if (isExist) {
             throw new BadRequestError(`Department name "${payload.name}" already exists under this faculty!`);

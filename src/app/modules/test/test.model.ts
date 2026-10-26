@@ -36,6 +36,7 @@ const TestSchema = new Schema<ITest>(
       default: TEST_STATUS.PUBLISHED,
     },
     totalQuestions: { type: Number, default: 0 },
+    durationMinutes: { type: Number, default: null },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true, versionKey: false }

@@ -11,6 +11,7 @@ import { USER_LANGUAGES } from "../../../interfaces";
 const createFaculty = async (payload: TCreateFacultyPayload) => {
     const isExist = await Faculty.findOne({
         name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+        isActive: true,
     });
 
     if (isExist) {
@@ -19,6 +20,26 @@ const createFaculty = async (payload: TCreateFacultyPayload) => {
         );
     }
     const generatedSlug = slugify(payload.name, { lower: true, strict: true });
+
+    // If an inactive faculty with the same name exists, restore/update it
+    const inactiveFaculty = await Faculty.findOne({
+        name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
+        isActive: false,
+    });
+
+    if (inactiveFaculty) {
+        inactiveFaculty.name = payload.name;
+        inactiveFaculty.nameInEnglish = payload.nameInEnglish || payload.name;
+        inactiveFaculty.nameInAlbanian = payload.nameInAlbanian || payload.name;
+        inactiveFaculty.slug = generatedSlug;
+        inactiveFaculty.isActive = true;
+        await inactiveFaculty.save();
+        return {
+            faculty: inactiveFaculty._id,
+            name: inactiveFaculty.name,
+            slug: inactiveFaculty.slug,
+        };
+    }
 
     const facultyData = {
         ...payload,
@@ -69,6 +90,7 @@ const updateFaculty = async (id: string, payload: any) => {
         const isExist = await Faculty.findOne({
             name: { $regex: new RegExp(`^${payload.name}$`, 'i') },
             _id: { $ne: id },
+            isActive: true,
         });
         if (isExist) {
             throw new BadRequestError(`Faculty name "${payload.name}" already exists!`);

@@ -38,6 +38,20 @@ const QuizSessionSchema = new Schema<IQuizSession>(
       ref: "User",
       required: true,
     },
+    testId: {
+      type: Schema.Types.ObjectId,
+      ref: "Test",
+      default: null,
+    },
+    title: {
+      type: String,
+      default: null,
+    },
+    mode: {
+      type: String,
+      enum: ["timed", "untimed"],
+      default: "timed",
+    },
     examType: {
       type: String,
       required: true,

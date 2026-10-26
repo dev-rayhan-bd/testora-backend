@@ -14,6 +14,9 @@ export interface IQuestionAttempt {
 export interface IQuizSession {
   _id?: Types.ObjectId;
   user: Types.ObjectId;
+  testId?: Types.ObjectId;
+  title?: string;
+  mode?: "timed" | "untimed";
   examType: TExamTypes;
   subjectIds: Types.ObjectId[];
   faculty?: Types.ObjectId;

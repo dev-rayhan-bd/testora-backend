@@ -11,6 +11,7 @@ import { QuizSession } from "./quiz.session.model";
 import { getRemaining, shuffle, sortWithPassage, splitCountBySubject } from "./quiz.session.utils";
 import { TFullSimulationPayload, TQuizSessionPayload } from "./quiz.session.zod";
 import Department from "../department/department.model";
+import Subject from "../subject/subject.model";
 
 
 
@@ -25,6 +26,7 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
   const testQuery: any = {
     examType: user.plan,
     testType: "official",
+    isActive: true,
   };
 
   const dept = query.department || query.departments;
@@ -35,21 +37,46 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
 
   const [quizzes, totalQuizzes] = await Promise.all([
     Test.find(testQuery)
-      .select("title totalQuestions subjects departments")
-      .sort({ createdAt: -1 })
+      .select("title totalQuestions subjects departments mandatorySubjects electiveSubjects year durationMinutes")
+      .sort({ year: -1, createdAt: -1 })
       .skip(skip)
-      .limit(limitNumber),
+      .limit(limitNumber)
+      .lean(),
     Test.countDocuments(testQuery)
   ]);
 
   const totalPages = Math.ceil(totalQuizzes / limitNumber);
-  const formattedQuizes = quizzes.map((quiz) => ({
-    _id: quiz._id,
-    title: quiz.title,
-    totalQuestions: quiz.totalQuestions,
-    subjects: quiz.subjects,
-    departments: quiz.departments,
-  }));
+  const formattedQuizes = await Promise.all(
+    quizzes.map(async (quiz) => {
+      let effectiveTotal = quiz.totalQuestions || 0;
+      const hasElectives = Boolean(quiz.electiveSubjects && quiz.electiveSubjects.length > 0);
+
+      if (hasElectives) {
+        const [mandatoryCount, oneElectiveCount] = await Promise.all([
+          Question.countDocuments({ testIds: quiz._id, isMandatory: true, isActive: true }),
+          quiz.electiveSubjects && quiz.electiveSubjects.length > 0
+            ? Question.countDocuments({ testIds: quiz._id, subject: quiz.electiveSubjects[0], isActive: true })
+            : 0,
+        ]);
+        if (mandatoryCount > 0 || oneElectiveCount > 0) {
+          effectiveTotal = mandatoryCount + oneElectiveCount;
+        }
+      }
+
+      return {
+        _id: quiz._id,
+        title: quiz.title,
+        totalQuestions: effectiveTotal,
+        rawTotalQuestions: quiz.totalQuestions,
+        mandatorySubjectsCount: quiz.mandatorySubjects?.length || 0,
+        electiveSubjectsCount: quiz.electiveSubjects?.length || 0,
+        hasElectives,
+        durationMinutes: (quiz as any).durationMinutes || null,
+        subjects: quiz.subjects,
+        departments: quiz.departments,
+      };
+    })
+  );
 
   return {
     meta: {
@@ -74,6 +101,7 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
   const testQuery: any = {
     examType: user.plan,
     testType: "additional",
+    isActive: true,
   };
 
   const dept = query.department || query.departments;
@@ -84,21 +112,46 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
 
   const [quizzes, totalQuizzes] = await Promise.all([
     Test.find(testQuery)
-      .select("title totalQuestions subjects departments")
-      .sort({ createdAt: -1 })
+      .select("title totalQuestions subjects departments mandatorySubjects electiveSubjects year durationMinutes")
+      .sort({ year: -1, createdAt: -1 })
       .skip(skip)
-      .limit(limitNumber),
+      .limit(limitNumber)
+      .lean(),
     Test.countDocuments(testQuery)
   ]);
 
   const totalPages = Math.ceil(totalQuizzes / limitNumber);
-  const formattedQuizes = quizzes.map((quiz) => ({
-    _id: quiz._id,
-    title: quiz.title,
-    totalQuestions: quiz.totalQuestions,
-    subjects: quiz.subjects,
-    departments: quiz.departments,
-  }));
+  const formattedQuizes = await Promise.all(
+    quizzes.map(async (quiz) => {
+      let effectiveTotal = quiz.totalQuestions || 0;
+      const hasElectives = Boolean(quiz.electiveSubjects && quiz.electiveSubjects.length > 0);
+
+      if (hasElectives) {
+        const [mandatoryCount, oneElectiveCount] = await Promise.all([
+          Question.countDocuments({ testIds: quiz._id, isMandatory: true, isActive: true }),
+          quiz.electiveSubjects && quiz.electiveSubjects.length > 0
+            ? Question.countDocuments({ testIds: quiz._id, subject: quiz.electiveSubjects[0], isActive: true })
+            : 0,
+        ]);
+        if (mandatoryCount > 0 || oneElectiveCount > 0) {
+          effectiveTotal = mandatoryCount + oneElectiveCount;
+        }
+      }
+
+      return {
+        _id: quiz._id,
+        title: quiz.title,
+        totalQuestions: effectiveTotal,
+        rawTotalQuestions: quiz.totalQuestions,
+        mandatorySubjectsCount: quiz.mandatorySubjects?.length || 0,
+        electiveSubjectsCount: quiz.electiveSubjects?.length || 0,
+        hasElectives,
+        durationMinutes: (quiz as any).durationMinutes || null,
+        subjects: quiz.subjects,
+        departments: quiz.departments,
+      };
+    })
+  );
 
   return {
     meta: {
@@ -138,8 +191,10 @@ const getMandatorySubjects = async (user: IUser, testId: string) => {
   });
 
   return {
-    mandatorySubjects: user.plan === 'matura' ? (test.mandatorySubjects as any[]).map(mapSubject) : [],
-    electiveSubjects: user.plan === 'matura' ? (test.electiveSubjects as any[]).map(mapSubject) : []
+    mandatorySubjects: ((test.mandatorySubjects as any[]) || []).map(mapSubject),
+    electiveSubjects: ((test.electiveSubjects as any[]) || []).map(mapSubject),
+    durationMinutes: (test as any).durationMinutes || null,
+    hasElectives: ((test.electiveSubjects as any[]) || []).length > 0,
   };
 };
 
@@ -213,7 +268,15 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
 
   const questionIds = sorted.map((q) => q._id);
   const totalQuestions = questionIds.length;
-  const durationSeconds = totalQuestions * 60; // 1 min per question
+  const isUntimed = payload.mode === "untimed" || payload.isTimed === false;
+  let durationSeconds: number;
+  if (isUntimed) {
+    durationSeconds = 86400; // 24 hours for untimed simulation
+  } else if ((test as any).durationMinutes && (test as any).durationMinutes > 0) {
+    durationSeconds = (test as any).durationMinutes * 60;
+  } else {
+    durationSeconds = totalQuestions * 60; // 1 min per question fallback
+  }
   const startedAt = new Date();
 
   // ── questionSubjectMap ──
@@ -258,6 +321,9 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
 
   const session = await QuizSession.create({
     user: user._id,
+    testId: test._id,
+    title: test.title,
+    mode: isUntimed ? "untimed" : "timed",
     examType: user.plan as TExamTypes,
     questionIds,
     totalQuestions,
@@ -274,9 +340,12 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
 
   return {
     sessionId: (session as any)._id,
+    title: test.title,
     totalQuestions,
     durationSeconds,
-    remainingSeconds: durationSeconds,
+    remainingSeconds: isUntimed ? 0 : durationSeconds,
+    isUntimed,
+    mode: isUntimed ? "untimed" : "timed",
     currentIndex: 0,
     currentQuestionId: questionIds[0],
   };
@@ -395,8 +464,11 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 
   const questionIds = allQuestions.map((q) => q._id);
   const totalQuestions = questionIds.length;
-  const durationSeconds = totalQuestions * 60; // 1 min per question
+  const durationSeconds = 86400; // Subject practice is untimed (Point 11.2)
   const startedAt = new Date();
+
+  const subjects = await Subject.find({ _id: { $in: subjectIds } }).select("name nameInAlbanian nameInEnglish");
+  const subjectTitle = subjects.map((s: any) => user.language === 'english' ? s.nameInEnglish : s.nameInAlbanian || s.name).join(", ");
 
   // ── questionSubjectMap ──
   // completeQuiz-এ subject-wise grid-এর জন্য
@@ -440,6 +512,8 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 
   const session = await QuizSession.create({
     user: user._id,
+    title: subjectTitle || "Subject Practice",
+    mode: "untimed",
     examType: user.plan as TExamTypes,
     subjectIds: subjectIds.map((id: string) => new Types.ObjectId(id)),
     ...(facultyId && { faculty: new Types.ObjectId(facultyId) }),
@@ -460,9 +534,12 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 
   return {
     sessionId: (session as any)._id,
+    title: subjectTitle || "Subject Practice",
     totalQuestions,
     durationSeconds,
-    remainingSeconds: durationSeconds,
+    remainingSeconds: 0,
+    isUntimed: true,
+    mode: "untimed",
     currentIndex: 0,
     currentQuestionId: questionIds[0],
   };
@@ -599,7 +676,7 @@ const getQuestionReview = async (sessionId: string, userId: Types.ObjectId, inde
   if (!questionId) throw new BadRequestError("Invalid index.");
 
   const question = await Question.findById(questionId)
-    .select("questionText questionImageUrl options correctOptionIndex explanation passage subject");
+    .select("questionText questionImageUrl options correctOptionIndex explanation explanationImageUrl passage subject");
   if (!question) throw new NotFoundError("Question not found.");
 
   const attempt = session.attempts.find(
@@ -614,6 +691,8 @@ const getQuestionReview = async (sessionId: string, userId: Types.ObjectId, inde
     options: question.options,
     correctOptionIndex: question.correctOptionIndex,
     explanation: question.explanation ?? null,
+    explanationImageUrl: question.explanationImageUrl ?? null,
+    explanationImage: question.explanationImageUrl ?? null,
     selectedOptionIndex: attempt?.selectedOptionIndex ?? null,
     status: !attempt
       ? "unanswered"
@@ -626,17 +705,33 @@ const getSessionStatus = async (sessionId: string, userId: Types.ObjectId) => {
   const session = await QuizSession.findOne({
     _id: new Types.ObjectId(sessionId),
     user: userId,
-  }).select("-attempts");
+  }).select("status startedAt durationSeconds currentIndex totalQuestions correctCount incorrectCount attempts questionIds mode");
 
   if (!session) throw new NotFoundError("Session not found.");
 
+  const isUntimed = session.mode === "untimed" || session.durationSeconds >= 86400;
+  const answeredQuestionSet = new Set((session.attempts || []).map((a) => a.questionId.toString()));
+  let nextUnansweredIndex = 0;
+  if (session.questionIds && session.questionIds.length > 0) {
+    for (let i = 0; i < session.questionIds.length; i++) {
+      if (!answeredQuestionSet.has(session.questionIds[i].toString())) {
+        nextUnansweredIndex = i;
+        break;
+      }
+    }
+  }
+
   return {
     status: session.status,
-    remainingSeconds: Math.floor(getRemaining(session)),
+    remainingSeconds: isUntimed ? 0 : Math.floor(getRemaining(session)),
     currentIndex: session.currentIndex,
+    nextUnansweredIndex,
+    answeredCount: (session.attempts || []).length,
     totalQuestions: session.totalQuestions,
     correctCount: session.correctCount,
     incorrectCount: session.incorrectCount,
+    isUntimed,
+    mode: session.mode || (isUntimed ? "untimed" : "timed"),
   };
 }
 

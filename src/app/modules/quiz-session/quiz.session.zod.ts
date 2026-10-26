@@ -21,6 +21,8 @@ export const quizSessionSchema = z.object({
 const fullSimulationSchema = z.object({
     subjects: z.array(z.string({ message: "Subject ID must be a string" })).optional(),
     departments: z.array(z.string({ message: "Department ID must be a string" })).optional(),
+    mode: z.enum(["timed", "untimed"]).optional().default("timed"),
+    isTimed: z.boolean().optional(),
 }).superRefine((data, ctx) => {
     if (data.subjects?.length === 0 && data.departments?.length === 0) {
         ctx.addIssue({

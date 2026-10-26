@@ -19,7 +19,8 @@ const getExamReadiness = async (user: IUser) => {
 
     if (sessions.length === 0) {
         return {
-            readinessPercent: 0,
+            readinessPercent: null,
+            isCalculated: false,
             totalQuizzes: 0,
             basedOn: "last 7 days",
         };
@@ -31,7 +32,9 @@ const getExamReadiness = async (user: IUser) => {
 
     return {
         readinessPercent,
+        isCalculated: true,
         totalQuizzes: sessions.length,
+        basedOn: "last 7 days",
     };
 };
 
@@ -146,29 +149,41 @@ const getInProgressSessions = async (user: IUser) => {
         examType: user.plan as TExamTypes,
         status: { $in: [QUIZ_STATUS.IN_PROGRESS] },
     })
-        .select("examType subjectIds durationSeconds startedAt currentIndex totalQuestions status")
-        .populate("subjectIds", "name")
+        .select("title testId examType subjectIds mode durationSeconds startedAt currentIndex totalQuestions attempts status questionIds")
+        .populate("testId", "title year")
+        .populate("subjectIds", "name nameInEnglish nameInAlbanian")
         .sort({ updatedAt: -1 })
         .limit(5)
         .lean();
 
-        console.log({sessions});
-
     const result = (sessions as any[]).map((s) => {
-        // wall clock remaining
+        const isUntimed = s.mode === "untimed" || s.durationSeconds >= 86400;
         const expireAt = new Date(s.startedAt).getTime() + s.durationSeconds * 1000;
-        const remainingSeconds = Math.max(0, (expireAt - now.getTime()) / 1000);
+        const remainingSeconds = isUntimed ? 0 : Math.max(0, (expireAt - now.getTime()) / 1000);
 
-        // expired check — wall clock দিয়ে
-        const isExpired =
-            s.status === QUIZ_STATUS.EXPIRED || remainingSeconds <= 0;
+        const isExpired = !isUntimed && (s.status === QUIZ_STATUS.EXPIRED || remainingSeconds <= 0);
 
-        // title — "2026 Semi-Matura · Math, Physics"
+        // Subject names formatted by user language
         const subjectNames = (s.subjectIds as any[])
-            .map((sub) => sub.name)
-            .join(", ");
-        console.log(`Session ${s._id} subjects: ${subjectNames}`);
-        const title = `${s.examType}`;
+            ? (s.subjectIds as any[])
+                .map((sub: any) => (user.language === 'english' ? sub.nameInEnglish : sub.nameInAlbanian) || sub.name)
+                .filter(Boolean)
+                .join(", ")
+            : "";
+
+        const title = (s.testId as any)?.title || s.title || (subjectNames ? subjectNames : `${s.examType}`);
+
+        // Find the first unanswered question index
+        const answeredQuestionSet = new Set((s.attempts || []).map((a: any) => a.questionId.toString()));
+        let nextUnansweredIndex = 0;
+        if (s.questionIds && s.questionIds.length > 0) {
+            for (let i = 0; i < s.questionIds.length; i++) {
+                if (!answeredQuestionSet.has(s.questionIds[i].toString())) {
+                    nextUnansweredIndex = i;
+                    break;
+                }
+            }
+        }
 
         return {
             sessionId: s._id,
@@ -176,8 +191,12 @@ const getInProgressSessions = async (user: IUser) => {
             examType: s.examType,
             status: isExpired ? "expired" : "in_progress",
             currentIndex: s.currentIndex,
+            nextUnansweredIndex,
+            answeredCount: (s.attempts || []).length,
             totalQuestions: s.totalQuestions,
-            remainingSeconds: isExpired ? 0 : Math.floor(remainingSeconds),
+            remainingSeconds: isUntimed ? 0 : (isExpired ? 0 : Math.floor(remainingSeconds)),
+            isUntimed,
+            mode: s.mode || (isUntimed ? "untimed" : "timed"),
             startedAt: s.startedAt,
         };
     });
@@ -192,8 +211,9 @@ const getRecentActivity = async (user: IUser) => {
     examType: user.plan as TExamTypes,
     status:   QUIZ_STATUS.COMPLETED,
   })
-    .select("subjectIds correctCount totalQuestions completedAt")
-    .populate("subjectIds", "name")
+    .select("title testId examType subjectIds correctCount totalQuestions completedAt")
+    .populate("testId", "title year")
+    .populate("subjectIds", "name nameInEnglish nameInAlbanian")
     .sort({ completedAt: -1 })
     .limit(10)
     .lean();
@@ -217,12 +237,18 @@ const getRecentActivity = async (user: IUser) => {
  
     // subject names
     const subjectNames = (s.subjectIds as any[])
-      .map((sub) => sub.name)
-      .join(", ");
+      ? (s.subjectIds as any[])
+          .map((sub: any) => (user.language === 'english' ? sub.nameInEnglish : sub.nameInAlbanian) || sub.name)
+          .filter(Boolean)
+          .join(", ")
+      : "";
+
+    const title = (s.testId as any)?.title || s.title || (subjectNames ? subjectNames : s.examType);
  
     return {
       sessionId:     s._id,
-      subjectNames,
+      title,
+      subjectNames:  subjectNames || title,
       scorePercent,
       score:         `${s.correctCount}/${s.totalQuestions}`,
       completedAt:   s.completedAt,
