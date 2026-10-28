@@ -268,15 +268,29 @@ export const getPaginatedTestsByType = async (
     }
 
 
-    // Department name diye id lookup
+    // Department name or ObjectId diye id lookup
     if (departments && departments.length > 0) {
-        const foundDepartments = await Department.find({
-            name: {
-                $in: departments.map(
-                    (dept) => new RegExp(`^${dept}$`, "i")  // case-insensitive exact match
-                ),
-            },
-        })
+        const objectIdDepts = departments
+            .filter((d: string) => typeof d === "string" && mongoose.Types.ObjectId.isValid(d))
+            .map((d: string) => new mongoose.Types.ObjectId(d));
+        const nameDepts = departments
+            .filter((d: string) => typeof d === "string" && !mongoose.Types.ObjectId.isValid(d));
+
+        const orConditions: any[] = [];
+        if (objectIdDepts.length > 0) {
+            orConditions.push({ _id: { $in: objectIdDepts } });
+        }
+        if (nameDepts.length > 0) {
+            orConditions.push({
+                name: {
+                    $in: nameDepts.map((dept) => new RegExp(`^${dept}$`, "i")),
+                },
+            });
+        }
+
+        const foundDepartments = await Department.find(
+            orConditions.length > 1 ? { $or: orConditions } : (orConditions[0] || {})
+        )
             .select("_id")
             .lean();
         console.log({foundDepartments})

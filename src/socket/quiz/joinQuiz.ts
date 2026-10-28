@@ -15,8 +15,9 @@ const joinQuiz = async (sessionId: string, userId: Types.ObjectId) => {
     if (session.status === QUIZ_STATUS.COMPLETED) throw new BadRequestError("Quiz already completed.");
     if (session.status === QUIZ_STATUS.EXPIRED)   throw new BadRequestError("Quiz has expired.");
  
-    const remaining = getRemaining(session);
-    if (remaining <= 0) {
+    const isUntimed = session.mode === "untimed" || session.durationSeconds >= 86400;
+    const remaining = isUntimed ? 0 : getRemaining(session);
+    if (!isUntimed && remaining <= 0) {
       await QuizSession.updateOne(
         { _id: session._id },
         { $set: { status: QUIZ_STATUS.EXPIRED, completedAt: new Date() } }
@@ -28,7 +29,9 @@ const joinQuiz = async (sessionId: string, userId: Types.ObjectId) => {
       sessionId:         session._id,
       totalQuestions:    session.totalQuestions,
       durationSeconds:   session.durationSeconds,
-      remainingSeconds:  Math.floor(remaining),
+      remainingSeconds:  isUntimed ? 0 : Math.floor(remaining),
+      isUntimed,
+      mode:              session.mode || (isUntimed ? "untimed" : "timed"),
       currentIndex:      session.currentIndex,
       currentQuestionId: session.questionIds[session.currentIndex],
       correctCount:      session.correctCount,

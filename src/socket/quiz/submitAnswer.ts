@@ -21,8 +21,9 @@ export interface SubmitAnswerPayload {
     if (!session)                         throw new NotFoundError("Session not found.");
     if (session.status !== "in_progress") throw new BadRequestError("Quiz is not in progress.");
  
-    const remaining = getRemaining(session);
-    if (remaining <= 0) {
+    const isUntimed = session.mode === "untimed" || session.durationSeconds >= 86400;
+    const remaining = isUntimed ? 0 : getRemaining(session);
+    if (!isUntimed && remaining <= 0) {
       await QuizSession.updateOne(
         { _id: session._id },
         { $set: { status: "expired", completedAt: new Date() } }
@@ -93,7 +94,7 @@ export interface SubmitAnswerPayload {
     return {
       isCorrect,
       correctOptionIndex: question.correctOptionIndex,
-      remainingSeconds:   Math.floor(remaining),
+      remainingSeconds:   isUntimed ? 0 : Math.floor(remaining),
       isUpdated:          existingAttemptIndex !== -1, // update ছিল কিনা frontend জানবে
     };
   }

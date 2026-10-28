@@ -27,6 +27,8 @@ export const handleQuizEvents = (
 
         socket.emit(SOCKET_EVENTS.QUIZ_JOINED, {
           remainingSeconds: data.remainingSeconds,
+          isUntimed: data.isUntimed,
+          mode: data.mode,
           currentIndex: data.currentIndex,
           totalQuestions: data.totalQuestions,
           correctCount: data.correctCount,

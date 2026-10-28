@@ -10,31 +10,72 @@ const getExamReadiness = async (user: IUser) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const sessions = await QuizSession.find({
+    // All-time completed sessions for study stats widget
+    const allCompletedSessions = await QuizSession.find({
         user: user._id,
         examType: user.plan as TExamTypes,
         status: QUIZ_STATUS.COMPLETED,
-        completedAt: { $gte: sevenDaysAgo },
-    }).select("correctCount totalQuestions completedAt");
+    }).select("correctCount totalQuestions completedAt").lean();
 
-    if (sessions.length === 0) {
+    const totalCompletedQuizzes = allCompletedSessions.length;
+
+    // Overall accuracy
+    const allTotalCorrect = (allCompletedSessions as any[]).reduce((sum, s) => sum + (s.correctCount || 0), 0);
+    const allTotalQuestions = (allCompletedSessions as any[]).reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
+    const accuracyPercent = allTotalQuestions > 0 ? Math.round((allTotalCorrect / allTotalQuestions) * 100) : 0;
+
+    // Best score % across completed quizzes
+    let bestScore = 0;
+    for (const s of allCompletedSessions as any[]) {
+        if (s.totalQuestions > 0) {
+            const score = Math.round(((s.correctCount || 0) / s.totalQuestions) * 100);
+            if (score > bestScore) bestScore = score;
+        }
+    }
+
+    // Active days count (distinct calendar dates with completed quizzes)
+    const activeDaysSet = new Set<string>();
+    for (const s of allCompletedSessions as any[]) {
+        if (s.completedAt) {
+            const dateStr = new Date(s.completedAt).toISOString().split('T')[0];
+            activeDaysSet.add(dateStr);
+        }
+    }
+    const activeDays = activeDaysSet.size;
+
+    // Recent 7-day sessions for exam readiness calculation
+    const recentSessions = (allCompletedSessions as any[]).filter(
+        (s) => s.completedAt && new Date(s.completedAt) >= sevenDaysAgo
+    );
+
+    if (recentSessions.length === 0) {
         return {
             readinessPercent: null,
             isCalculated: false,
             totalQuizzes: 0,
             basedOn: "last 7 days",
+            totalCompletedQuizzes,
+            accuracyPercent,
+            quizAccuracy: accuracyPercent,
+            bestScore,
+            activeDays,
         };
     }
 
-    const totalCorrect = (sessions as any[]).reduce((sum, s) => sum + s.correctCount, 0);
-    const totalQuestions = (sessions as any[]).reduce((sum, s) => sum + s.totalQuestions, 0);
-    const readinessPercent = Math.round((totalCorrect / totalQuestions) * 100);
+    const totalCorrect = recentSessions.reduce((sum, s) => sum + (s.correctCount || 0), 0);
+    const totalQuestions = recentSessions.reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
+    const readinessPercent = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
     return {
         readinessPercent,
         isCalculated: true,
-        totalQuizzes: sessions.length,
+        totalQuizzes: recentSessions.length,
         basedOn: "last 7 days",
+        totalCompletedQuizzes,
+        accuracyPercent,
+        quizAccuracy: accuracyPercent,
+        bestScore,
+        activeDays,
     };
 };
 

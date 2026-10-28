@@ -29,7 +29,7 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     isActive: true,
   };
 
-  const dept = query.department || query.departments;
+  const dept = query.departments || query.department || query.departmentId;
   if (dept) {
     const deptIds = Array.isArray(dept) ? dept : [dept];
     testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
@@ -67,9 +67,11 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
         _id: quiz._id,
         title: quiz.title,
         totalQuestions: effectiveTotal,
+        studentTotalQuestions: effectiveTotal,
         rawTotalQuestions: quiz.totalQuestions,
         mandatorySubjectsCount: quiz.mandatorySubjects?.length || 0,
         electiveSubjectsCount: quiz.electiveSubjects?.length || 0,
+        totalSubjectsCount: hasElectives ? (quiz.mandatorySubjects?.length || 0) + 1 : ((quiz.subjects as any[])?.length || 0),
         hasElectives,
         durationMinutes: (quiz as any).durationMinutes || null,
         subjects: quiz.subjects,
@@ -104,7 +106,7 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     isActive: true,
   };
 
-  const dept = query.department || query.departments;
+  const dept = query.departments || query.department || query.departmentId;
   if (dept) {
     const deptIds = Array.isArray(dept) ? dept : [dept];
     testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
@@ -142,9 +144,11 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
         _id: quiz._id,
         title: quiz.title,
         totalQuestions: effectiveTotal,
+        studentTotalQuestions: effectiveTotal,
         rawTotalQuestions: quiz.totalQuestions,
         mandatorySubjectsCount: quiz.mandatorySubjects?.length || 0,
         electiveSubjectsCount: quiz.electiveSubjects?.length || 0,
+        totalSubjectsCount: hasElectives ? (quiz.mandatorySubjects?.length || 0) + 1 : ((quiz.subjects as any[])?.length || 0),
         hasElectives,
         durationMinutes: (quiz as any).durationMinutes || null,
         subjects: quiz.subjects,

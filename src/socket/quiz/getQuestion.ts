@@ -79,6 +79,7 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
     questionId: question._id,
     questionText: question.questionText,
     questionImage: question.questionImageUrl ?? null,
+    subjectName: (question.subject as any)?.name ?? null,
     subject: question.subject ? {
       _id: (question.subject as any)._id,
       name: (question.subject as any).name,

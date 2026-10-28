@@ -14,6 +14,13 @@ quizRouter.get(
   quizSessionController.getOfficialQuizzes,
 );
 
+// Alias for /quiz/official
+quizRouter.get(
+  '/templates',
+  authMiddleware(USER_ROLE.STUDENT),
+  quizSessionController.getOfficialQuizzes,
+);
+
 quizRouter.get(
   '/additional',
   authMiddleware(USER_ROLE.STUDENT),
