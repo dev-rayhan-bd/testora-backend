@@ -3,6 +3,8 @@ import slugify from "slugify";
 import { BadRequestError } from "../../errors/request/apiError";
 
 import Faculty from "./faculty.model";
+import Department from "../department/department.model";
+import Test from "../test/test.model";
 import { TCreateFacultyPayload } from "./faculty.zod";
 import { IUser } from "../user/user.interface";
 import { USER_LANGUAGES } from "../../../interfaces";
@@ -113,6 +115,13 @@ const deleteFaculty = async (id: string) => {
 
     faculty.isActive = false;
     await faculty.save();
+
+    // Cascade: Deactivate all child departments under this faculty
+    await Department.updateMany({ faculty: id }, { isActive: false });
+
+    // Cascade: Deactivate all tests under this faculty
+    await Test.updateMany({ faculty: id }, { isActive: false });
+
     return { message: "Faculty removed successfully" };
 };
 

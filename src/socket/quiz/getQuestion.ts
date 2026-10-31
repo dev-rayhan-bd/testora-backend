@@ -9,11 +9,19 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
   const session = await QuizSession.findOne({
     _id: new Types.ObjectId(sessionId),
     user: userId,
-  }).select("status questionIds totalQuestions attempts markedQuestionIds passageQuestionMap");
+  }).select("status questionIds totalQuestions attempts markedQuestionIds passageQuestionMap currentIndex");
 
   if (!session) throw new NotFoundError("Session not found.");
   if (session.status !== "in_progress") throw new BadRequestError("Quiz is not in progress.");
   if (index >= session.totalQuestions) throw new BadRequestError("No more questions.");
+
+  // Persist current question index in database so user resumes from here if app closes
+  if (index >= 0 && index < session.totalQuestions && session.currentIndex !== index) {
+    await QuizSession.updateOne(
+      { _id: session._id },
+      { $set: { currentIndex: index } }
+    );
+  }
 
   const questionId = session.questionIds[index];
 

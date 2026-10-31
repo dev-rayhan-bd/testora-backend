@@ -6,6 +6,8 @@ import { BadRequestError } from "../../errors/request/apiError";
 import Faculty from "../faculty/faculty.model";
 import { IUser } from "../user/user.interface";
 import Department from "./department.model";
+import Test from "../test/test.model";
+import Question from "../question/question.model";
 import { TCreateDepartmentPayload } from "./department.zod";
 
 
@@ -129,6 +131,17 @@ const deleteDepartment = async (id: string) => {
 
     department.isActive = false;
     await department.save();
+
+    // Cascade: Remove this department from tests and questions
+    await Test.updateMany(
+        { departments: id },
+        { $pull: { departments: new mongoose.Types.ObjectId(id) } }
+    );
+    await Question.updateMany(
+        { departments: id },
+        { $pull: { departments: new mongoose.Types.ObjectId(id) } }
+    );
+
     return { message: "Department removed successfully" };
 };
 

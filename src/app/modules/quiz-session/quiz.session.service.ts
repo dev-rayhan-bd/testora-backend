@@ -1,6 +1,6 @@
 
 import { Types } from "mongoose";
-import { TExamTypes } from "../../../interfaces";
+import { TExamTypes, EXAM_TYPES } from "../../../interfaces";
 import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
 import Question from "../question/question.model";
 import Subscription from "../subscription/subscription.model";
@@ -12,6 +12,7 @@ import { getRemaining, shuffle, sortWithPassage, splitCountBySubject } from "./q
 import { TFullSimulationPayload, TQuizSessionPayload } from "./quiz.session.zod";
 import Department from "../department/department.model";
 import Subject from "../subject/subject.model";
+import Faculty from "../faculty/faculty.model";
 
 
 
@@ -29,10 +30,29 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     isActive: true,
   };
 
+  if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
+    const facultyDoc = await Faculty.findOne({
+      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
+      isActive: true,
+    }).select("_id");
+    if (facultyDoc) {
+      testQuery.faculty = facultyDoc._id;
+    }
+  }
+
   const dept = query.departments || query.department || query.departmentId;
   if (dept) {
-    const deptIds = Array.isArray(dept) ? dept : [dept];
-    testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
+    const rawDeptIds = Array.isArray(dept) ? dept : [dept];
+    const validDeptIds = rawDeptIds
+      .filter((id) => typeof id === "string" && Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const activeDepts = await Department.find({
+      _id: { $in: validDeptIds },
+      isActive: true,
+    }).select("_id");
+
+    testQuery.departments = { $in: activeDepts.map((d) => d._id) };
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
@@ -106,10 +126,29 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     isActive: true,
   };
 
+  if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
+    const facultyDoc = await Faculty.findOne({
+      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
+      isActive: true,
+    }).select("_id");
+    if (facultyDoc) {
+      testQuery.faculty = facultyDoc._id;
+    }
+  }
+
   const dept = query.departments || query.department || query.departmentId;
   if (dept) {
-    const deptIds = Array.isArray(dept) ? dept : [dept];
-    testQuery.departments = { $in: deptIds.map((id: any) => new Types.ObjectId(id)) };
+    const rawDeptIds = Array.isArray(dept) ? dept : [dept];
+    const validDeptIds = rawDeptIds
+      .filter((id) => typeof id === "string" && Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const activeDepts = await Department.find({
+      _id: { $in: validDeptIds },
+      isActive: true,
+    }).select("_id");
+
+    testQuery.departments = { $in: activeDepts.map((d) => d._id) };
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
