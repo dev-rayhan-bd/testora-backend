@@ -507,7 +507,15 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
 
   const questionIds = allQuestions.map((q) => q._id);
   const totalQuestions = questionIds.length;
-  const durationSeconds = 86400; // Subject practice is untimed (Point 11.2)
+  const isUntimed = payload.mode === "untimed" || payload.isTimed === false;
+  let durationSeconds: number;
+  if (isUntimed) {
+    durationSeconds = 86400;
+  } else if (payload.durationMinutes && Number(payload.durationMinutes) > 0) {
+    durationSeconds = Number(payload.durationMinutes) * 60;
+  } else {
+    durationSeconds = totalQuestions * 60; // 1 min per question default (e.g. 10 questions = 600s / 10m)
+  }
   const startedAt = new Date();
 
   const subjects = await Subject.find({ _id: { $in: subjectIds } }).select("name nameInAlbanian nameInEnglish");
@@ -556,7 +564,7 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
   const session = await QuizSession.create({
     user: user._id,
     title: subjectTitle || "Subject Practice",
-    mode: "untimed",
+    mode: isUntimed ? "untimed" : "timed",
     examType: user.plan as TExamTypes,
     subjectIds: subjectIds.map((id: string) => new Types.ObjectId(id)),
     ...(facultyId && { faculty: new Types.ObjectId(facultyId) }),
@@ -580,9 +588,9 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
     title: subjectTitle || "Subject Practice",
     totalQuestions,
     durationSeconds,
-    remainingSeconds: 0,
-    isUntimed: true,
-    mode: "untimed",
+    remainingSeconds: isUntimed ? 0 : durationSeconds,
+    isUntimed,
+    mode: isUntimed ? "untimed" : "timed",
     currentIndex: 0,
     currentQuestionId: questionIds[0],
   };
