@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "cross-env NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "start": "node init && node dist/server.js",
+    "dev": "node init && cross-env NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "node init && tsc",
     "postinstall": "tsc",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",

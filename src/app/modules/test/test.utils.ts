@@ -259,7 +259,7 @@ export const getPaginatedTestsByType = async (
     }
      
 
-    if (input.examType === EXAM_TYPES.ENTRANCE_EXAM && input.faculty) {
+    if ((!departments || departments.length === 0) && input.examType === EXAM_TYPES.ENTRANCE_EXAM && input.faculty) {
         const facultyDoc = await Faculty.findOne({
             name: { $regex: new RegExp(`^${escapeRegExp(input.faculty)}$`, "i") },
         }).select("_id");
