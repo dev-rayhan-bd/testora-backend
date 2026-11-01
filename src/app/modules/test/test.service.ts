@@ -411,6 +411,22 @@ const getQuestionsByTestId = async (
       },
     },
 
+    // subject populate
+    {
+      $lookup: {
+        from: "subjects",
+        localField: "subject",
+        foreignField: "_id",
+        as: "subjectDetails",
+      },
+    },
+    {
+      $unwind: {
+        path: "$subjectDetails",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
     // total count + paginated data
     {
       $facet: {
@@ -428,6 +444,19 @@ const getQuestionsByTestId = async (
               year: 1,
               correctOptionIndex: 1,
               explanation: 1,
+              subject: {
+                $cond: {
+                  if: { $gt: [{ $ifNull: ["$subjectDetails", 0] }, 0] },
+                  then: {
+                    _id: "$subjectDetails._id",
+                    name: "$subjectDetails.name",
+                    nameInEnglish: "$subjectDetails.nameInEnglish",
+                    nameInAlbanian: "$subjectDetails.nameInAlbanian",
+                    slug: "$subjectDetails.slug",
+                  },
+                  else: null,
+                },
+              },
               passageRaw: {
                 $cond: {
                   if: { $gt: [{ $ifNull: ["$passageDetails", 0] }, 0] },

@@ -30,16 +30,6 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     isActive: true,
   };
 
-  if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
-    const facultyDoc = await Faculty.findOne({
-      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
-      isActive: true,
-    }).select("_id");
-    if (facultyDoc) {
-      testQuery.faculty = facultyDoc._id;
-    }
-  }
-
   const dept = query.departments || query.department || query.departmentId;
   if (dept) {
     const rawDeptIds = Array.isArray(dept) ? dept : [dept];
@@ -53,6 +43,14 @@ const getOfficialQuizzes = async (user: IUser, query: Record<string, unknown>) =
     }).select("_id");
 
     testQuery.departments = { $in: activeDepts.map((d) => d._id) };
+  } else if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
+    const facultyDoc = await Faculty.findOne({
+      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
+      isActive: true,
+    }).select("_id");
+    if (facultyDoc) {
+      testQuery.faculty = facultyDoc._id;
+    }
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
@@ -126,16 +124,6 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     isActive: true,
   };
 
-  if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
-    const facultyDoc = await Faculty.findOne({
-      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
-      isActive: true,
-    }).select("_id");
-    if (facultyDoc) {
-      testQuery.faculty = facultyDoc._id;
-    }
-  }
-
   const dept = query.departments || query.department || query.departmentId;
   if (dept) {
     const rawDeptIds = Array.isArray(dept) ? dept : [dept];
@@ -149,6 +137,14 @@ const getAdditionalQuizzes = async (user: IUser, query: Record<string, unknown>)
     }).select("_id");
 
     testQuery.departments = { $in: activeDepts.map((d) => d._id) };
+  } else if (user.plan === EXAM_TYPES.ENTRANCE_EXAM && user.faculty) {
+    const facultyDoc = await Faculty.findOne({
+      name: { $regex: new RegExp(`^${user.faculty}$`, "i") },
+      isActive: true,
+    }).select("_id");
+    if (facultyDoc) {
+      testQuery.faculty = facultyDoc._id;
+    }
   }
 
   const [quizzes, totalQuizzes] = await Promise.all([
@@ -791,7 +787,9 @@ const getQuizMap = async (sessionId: string, userId: Types.ObjectId) => {
   const session = await QuizSession.findOne({
     _id: new Types.ObjectId(sessionId),
     user: userId,
-  }).select("status questionIds attempts markedQuestionIds currentIndex totalQuestions");
+  })
+    .select("status questionIds attempts markedQuestionIds currentIndex totalQuestions questionSubjectMap")
+    .populate("questionSubjectMap.subjectId", "name nameInEnglish nameInAlbanian slug");
 
   if (!session) throw new NotFoundError("Session not found.");
   if (session.status !== "in_progress") throw new BadRequestError("Quiz is not in progress.");
@@ -802,6 +800,19 @@ const getQuizMap = async (sessionId: string, userId: Types.ObjectId) => {
   const markedSet = new Set(
     session.markedQuestionIds.map((id) => id.toString())
   );
+
+  const subjectMap = new Map();
+  (session.questionSubjectMap || []).forEach((item: any) => {
+    if (item.questionId && item.subjectId) {
+      subjectMap.set(item.questionId.toString(), {
+        _id: item.subjectId._id,
+        name: item.subjectId.name,
+        nameInEnglish: item.subjectId.nameInEnglish,
+        nameInAlbanian: item.subjectId.nameInAlbanian,
+        slug: item.subjectId.slug,
+      });
+    }
+  });
 
   const questions = session.questionIds.map((qId, index) => {
     const qIdStr = qId.toString();
@@ -816,11 +827,16 @@ const getQuizMap = async (sessionId: string, userId: Types.ObjectId) => {
     else if (attempt) status = "answered";
     else status = "unanswered";
 
+    const subjectInfo = subjectMap.get(qIdStr) || null;
+
     return {
       index,
       questionId: qId,
       status,
       selectedOptionIndex: attempt?.selectedOptionIndex ?? null,
+      subjectId: subjectInfo?._id || null,
+      subjectName: subjectInfo?.name || null,
+      subject: subjectInfo,
     };
   });
 
