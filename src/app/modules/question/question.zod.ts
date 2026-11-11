@@ -69,7 +69,12 @@ export const createQuestionSchema = z
       .max(new Date().getFullYear(), { message: "Year cannot be in the future" }),
     subject: z.string({ message: "Subject ID must be a string" }).optional(),
     faculty: z.string({ message: "Faculty ID must be a string" }).optional(),
-    departments: z.array(z.string({ message: "Department ID must be a string" })).optional(),
+    departments: z
+      .union([
+        z.string().transform((val) => [val]),
+        z.array(z.string({ message: "Department ID must be a string" })),
+      ])
+      .optional(),
     passage: z.string({ message: "Passage ID must be a string" }).optional(),
     source: z.enum(["archive", "practice", "both"], {
       message: "Source must be archive, practice or both",
@@ -129,6 +134,13 @@ export const createQuestionSchema = z
     }
 
     if (data.examType === "provime") {
+      if (!data.subject) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['subject'],
+          message: "Subject ID is required when exam type is provime",
+        });
+      }
       if (!data.faculty) {
         ctx.addIssue({
           code: 'custom',
@@ -139,7 +151,7 @@ export const createQuestionSchema = z
           message: "Faculty ID is required when exam type is provime",
         });
       }
-      if (!data.departments) {
+      if (!data.departments || (Array.isArray(data.departments) && data.departments.length === 0)) {
         ctx.addIssue({
           code: 'custom',
           maximum: 1,
@@ -147,17 +159,6 @@ export const createQuestionSchema = z
           inclusive: true,
           path: ['error'],
           message: "Department ID is required when exam type is provime",
-        });
-      }
-
-      if (data.subject) {
-        ctx.addIssue({
-          code: 'custom',
-          maximum: 1,
-          origin: 'superRefine',
-          inclusive: true,
-          path: ['error'],
-          message: "Subject ID is not required when exam type is provime",
         });
       }
     }
@@ -174,9 +175,15 @@ const updateQuestionSchema = z
       .min(2000, { message: "Year must be 2000 or later" })
       .max(new Date().getFullYear(), { message: "Year cannot be in the future" })
       .optional(),
+    subject: z.string({ message: "Subject ID must be a string" }).optional(),
     subjects: z.string({ message: "Subject ID must be a string" }).optional(),
     faculty: z.string({ message: "Faculty ID must be a string" }).optional(),
-    departments: z.string({ message: "Department ID must be a string" }).optional(),
+    departments: z
+      .union([
+        z.string().transform((val) => [val]),
+        z.array(z.string({ message: "Department ID must be a string" })),
+      ])
+      .optional(),
     passage: z.string({ message: "Passage ID must be a string" }).optional(),
     source: z.enum(["archive", "practice", "both"], {
       message: "Source must be archive, practice or both",

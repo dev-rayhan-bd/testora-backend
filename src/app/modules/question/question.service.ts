@@ -20,7 +20,6 @@ const createQuestion = async (
 ): Promise<IQuestion> => {
 
     if (payload.examType && (payload.examType === EXAM_TYPES.MATURA || payload.examType === EXAM_TYPES.SEMI_MATURA)) {
-
         const isExistSubject = await Subject.findOne({ _id: payload.subject, examType: payload.examType }).select("_id");
 
         if (!isExistSubject) {
@@ -29,14 +28,21 @@ const createQuestion = async (
     }
 
     if (payload.examType && (payload.examType === EXAM_TYPES.ENTRANCE_EXAM)) {
+        if (payload.subject) {
+            const isExistSubject = await Subject.findOne({ _id: payload.subject, examType: payload.examType }).select("_id");
+            if (!isExistSubject) {
+                throw new BadRequestError("Subject not found for the given exam type");
+            }
+        }
         const isExistFaculty = await Faculty.findOne({ _id: payload.faculty, examType: payload.examType }).select("_id");
 
         if (!isExistFaculty) {
             throw new BadRequestError("Faculty not found for the given exam type");
         }
-        const isExistDepartment = await Department.findOne({ _id: payload.departments, examType: payload.examType, faculty: payload.faculty }).select("_id");
+        const deptIds = (Array.isArray(payload.departments) ? payload.departments : [payload.departments]).filter(Boolean) as string[];
+        const validDeptsCount = await Department.countDocuments({ _id: { $in: deptIds as any }, faculty: payload.faculty });
 
-        if (!isExistDepartment) {
+        if (validDeptsCount === 0) {
             throw new BadRequestError("Department not found for the given faculty and exam type");
         }
     }
@@ -110,31 +116,37 @@ const fetchQuestions = async (
     const pipeline: any[] = [
         { $match: query },
 
-        // Subject Join (Only if NOT provime)
-        ...(input.examType !== "provime" ? [
-            {
-                $lookup: {
-                    from: "subjects",
-                    localField: "subjects",
-                    foreignField: "_id",
-                    as: "subject"
-                }
-            },
-            { $unwind: { path: "$subject", preserveNullAndEmptyArrays: true } }
-        ] : []),
+        // Subject Join (for all exam types)
+        {
+            $lookup: {
+                from: "subjects",
+                localField: "subject",
+                foreignField: "_id",
+                as: "subjectDetails"
+            }
+        },
+        { $unwind: { path: "$subjectDetails", preserveNullAndEmptyArrays: true } },
 
-        // Department Join (Only for Provime)
-        ...(input.examType === "provime" ? [
-            {
-                $lookup: {
-                    from: "departments",
-                    localField: "departments",
-                    foreignField: "_id",
-                    as: "department"
-                }
-            },
-            { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } }
-        ] : []),
+        // Faculty Join (for provime)
+        {
+            $lookup: {
+                from: "faculties",
+                localField: "faculty",
+                foreignField: "_id",
+                as: "facultyDetails"
+            }
+        },
+        { $unwind: { path: "$facultyDetails", preserveNullAndEmptyArrays: true } },
+
+        // Department Join (for provime)
+        {
+            $lookup: {
+                from: "departments",
+                localField: "departments",
+                foreignField: "_id",
+                as: "departmentDetails"
+            }
+        },
 
         // Passage Join
         {
@@ -142,10 +154,10 @@ const fetchQuestions = async (
                 from: "passages",
                 localField: "passage",
                 foreignField: "_id",
-                as: "passage"
+                as: "passageDetails"
             }
         },
-        { $unwind: { path: "$passage", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$passageDetails", preserveNullAndEmptyArrays: true } },
 
         { $sort: { createdAt: -1 } },
 
@@ -159,9 +171,25 @@ const fetchQuestions = async (
                             _id: 0,
                             questionId: "$_id",
                             questionText: 1,
-                            subjectName: input.examType === "provime" ? null : { $ifNull: ["$subject.name", null] },
-                            departmentName: input.examType === "provime" ? { $ifNull: ["$department.name", null] } : null,
-                            passageTitle: { $ifNull: ["$passage.title", null] },
+                            subjectId: { $ifNull: ["$subjectDetails._id", null] },
+                            subjectName: { $ifNull: ["$subjectDetails.name", null] },
+                            facultyId: { $ifNull: ["$facultyDetails._id", null] },
+                            facultyName: { $ifNull: ["$facultyDetails.name", null] },
+                            departments: {
+                                $map: {
+                                    input: "$departmentDetails",
+                                    as: "d",
+                                    in: { _id: "$$d._id", name: "$$d.name", slug: "$$d.slug" }
+                                }
+                            },
+                            departmentName: {
+                                $cond: {
+                                    if: { $gt: [{ $size: { $ifNull: ["$departmentDetails", []] } }, 0] },
+                                    then: { $arrayElemAt: ["$departmentDetails.name", 0] },
+                                    else: null
+                                }
+                            },
+                            passageTitle: { $ifNull: ["$passageDetails.title", null] },
                             status: 1,
                             year: 1,
                             examType: 1

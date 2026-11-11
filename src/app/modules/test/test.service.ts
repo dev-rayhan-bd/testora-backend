@@ -246,7 +246,16 @@ const importTestsFromCsvFile = async (fileBuffer: Buffer) => {
         ? await Question.find({ _id: { $in: toLinkExistingIds } }).session(session)
         : [];
 
-    // Update test metadata: title and totalQuestions increment.
+    // Update test metadata: title, subjects, departments and totalQuestions.
+    const allSubjectIds = [...new Set(resolvedContexts.map((c) => c.subject?.toString()).filter(Boolean))].map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+    const allDepartmentIds = [
+      ...new Set(
+        resolvedContexts.flatMap((c) => (c.departments || []).map((d: any) => d.toString())).filter(Boolean)
+      ),
+    ].map((id) => new mongoose.Types.ObjectId(id));
+
     const totalAdded = newQuestionDocs.length + newlyLinkedExisting.length;
     await Test.findByIdAndUpdate(
       createdTest._id,
@@ -258,7 +267,9 @@ const importTestsFromCsvFile = async (fileBuffer: Buffer) => {
           year: firstRow.year,
           testType: firstRow.testType,
           access: firstRow.access,
-          ...resolvedContexts[0],
+          subjects: allSubjectIds,
+          ...(allDepartmentIds.length > 0 ? { departments: allDepartmentIds } : {}),
+          ...(resolvedContexts[0]?.faculty ? { faculty: resolvedContexts[0].faculty } : {}),
         },
         $inc: { totalQuestions: totalAdded },
       },
@@ -657,6 +668,52 @@ const getLinkableQuestions = async (
   }));
 };
 
+// ─── Sync Test Metadata from Linked Questions ────────────────
+export const syncTestMetadata = async (testId: string | Types.ObjectId) => {
+  const linkedQuestions = await Question.find({
+    testIds: testId,
+    isActive: true,
+  }).select("subject departments faculty");
+
+  const totalQuestions = linkedQuestions.length;
+
+  const subjectIdSet = new Set<string>();
+  const departmentIdSet = new Set<string>();
+  let resolvedFaculty: Types.ObjectId | null = null;
+
+  linkedQuestions.forEach((q) => {
+    if (q.subject) {
+      subjectIdSet.add(q.subject.toString());
+    }
+    if (q.departments && Array.isArray(q.departments)) {
+      q.departments.forEach((d) => {
+        if (d) departmentIdSet.add(d.toString());
+      });
+    }
+    if (q.faculty && !resolvedFaculty) {
+      resolvedFaculty = q.faculty as any;
+    }
+  });
+
+  const subjectObjectIds = [...subjectIdSet].map((id) => new mongoose.Types.ObjectId(id));
+  const departmentObjectIds = [...departmentIdSet].map((id) => new mongoose.Types.ObjectId(id));
+
+  const updateDoc: any = {
+    totalQuestions,
+    subjects: subjectObjectIds,
+  };
+
+  if (departmentObjectIds.length > 0) {
+    updateDoc.departments = departmentObjectIds;
+  }
+  if (resolvedFaculty) {
+    updateDoc.faculty = resolvedFaculty;
+  }
+
+  const updatedTest = await Test.findByIdAndUpdate(testId, updateDoc, { new: true });
+  return updatedTest;
+};
+
 // ─── Link Questions ───────────────────────────────────────────
 const linkQuestions = async (testId: string, questionIds: string[]) => {
   const test = await Test.findById(testId);
@@ -691,16 +748,15 @@ const linkQuestions = async (testId: string, questionIds: string[]) => {
     throw new BadRequestError("Some questions not found or not published");
   }
 
-  const newIds = validQuestions.map((q) => q._id as Types.ObjectId);+
+  const newIds = validQuestions.map((q) => q._id as Types.ObjectId);
 
   await Question.updateMany(
     { _id: { $in: newIds } },
     { $addToSet: { testIds: new mongoose.Types.ObjectId(testId) } }
   );
 
-  await Test.findByIdAndUpdate(testId, {
-    $inc: { totalQuestions: newIds.length },
-  });
+  // Sync subjects, departments, faculty, totalQuestions
+  await syncTestMetadata(testId);
 
   return Test.findById(testId).select("-__v");
 };
@@ -727,9 +783,8 @@ const removeQuestion = async (testId: string, questionId: string) => {
     $pull: { testIds: new mongoose.Types.ObjectId(testId) },
   });
 
-  await Test.findByIdAndUpdate(testId, {
-    $inc: { totalQuestions: -1 },
-  });
+  // Sync remaining subjects, departments, faculty, totalQuestions
+  await syncTestMetadata(testId);
 
   return Test.findById(testId).select("-__v");
 };
@@ -760,6 +815,9 @@ const publishTest = async (id: string): Promise<ITest> => {
   if (linkedQuestionCount === 0) {
     throw new BadRequestError("Cannot publish a test with no questions");
   }
+
+  // Ensure metadata is completely synced on publish
+  await syncTestMetadata(id);
 
   test.status = "published";
   await test.save();
@@ -800,6 +858,7 @@ export const testService = {
   getTestWithQuestions,
   getLinkableQuestions,
   linkQuestions,
+  syncTestMetadata,
   getYearRange,
   removeQuestion,
   reorderQuestions,

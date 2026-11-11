@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { BadRequestError } from "../app/errors/request/apiError";
 import Department from "../app/modules/department/department.model";
 import Question from "../app/modules/question/question.model";
@@ -34,79 +35,87 @@ export const filterQuestions = async (input: QuestionFilterInput) => {
             );
         }
 
-        // subject names → IDs
+        const objectIdSubjects = subjectsArray.filter((s) => mongoose.Types.ObjectId.isValid(s));
+        const nameSubjects = subjectsArray.filter((s) => !mongoose.Types.ObjectId.isValid(s));
+
+        const orConditions: any[] = [];
+        if (objectIdSubjects.length > 0) orConditions.push({ _id: { $in: objectIdSubjects } });
+        if (nameSubjects.length > 0) orConditions.push({ name: { $in: nameSubjects.map(n => new RegExp(`^${n}$`, "i")) } });
+
         const foundSubjects = await Subject.find({
-            name: { $in: subjectsArray },
+            ...(orConditions.length > 1 ? { $or: orConditions } : (orConditions[0] || {})),
             examType,
             isActive: true,
         }).select("_id name");
 
-        console.log({ foundSubjects })
         if (foundSubjects.length === 0) {
             throw new BadRequestError("No matching subjects found");
         }
 
-        // কোনো subject পাওয়া যায়নি সেটা জানাও
-        if (foundSubjects.length !== subjectsArray.length) {
-            const foundNames = foundSubjects.map((s) => s.name);
-            const notFound = subjectsArray.filter((s) => !foundNames.includes(s));
-            throw new BadRequestError(`Subjects not found: ${notFound.join(", ")}`);
-        }
+        const subjectIds = foundSubjects.map((s) => s._id);
 
-        const subjectss = foundSubjects.map((s) => s._id);
-        console.log({ subjectss })
-        // subject IDs দিয়ে questions fetch
-        // source: archive | both — test archive এর জন্য
         const query: Record<string, unknown> = {
             examType,
-            subjects: { $in: subjectss },
+            $or: [
+                { subject: { $in: subjectIds } },
+                { subjects: { $in: subjectIds } }
+            ],
             source: { $in: ["archive", "both"] },
-            year: year ? Number(year) : undefined
         };
 
         if (input.year) query.year = Number(input.year);
-        console.log({ query })
         return query;
     }
 
     // ── provime ───────────────────────────────────────────────
     if (examType === "provime") {
-        if (!departmentsArray || departmentsArray.length === 0) {
-            throw new BadRequestError("At least one department is required for provime");
-        }
-        console.log({ departmentsArray })
-        // departments valid কিনা check
-        const foundDepartments = await Department.find({
-            name: { $in: departmentsArray },
-            examType,
-            isActive: true,
-        }).select("_id name");
-
-        console.log({ foundDepartments })
-        if (foundDepartments.length === 0) {
-            throw new BadRequestError("No matching departments found");
-        }
-
-        // কোনো subject পাওয়া যায়নি সেটা জানাও
-        if (foundDepartments.length !== departmentsArray.length) {
-            const foundNames = foundDepartments.map((d) => d.name);
-            const notFound = departmentsArray.filter((d) => !foundNames.includes(d));
-            throw new BadRequestError(`Departments not found: ${notFound.join(", ")}`);
-        }
-
-        const departmentss = foundDepartments.map((d) => d._id);
-        console.log({ departmentss })
-        // department IDs দিয়ে questions fetch
-        // source: archive | both — test archive এর জন্য
         const query: Record<string, unknown> = {
             examType,
-            departments: { $in: departmentss },
             source: { $in: ["archive", "both"] },
-            year: year ? Number(year) : undefined
         };
 
+        if (departmentsArray && departmentsArray.length > 0) {
+            const objectIdDepts = departmentsArray.filter((d) => mongoose.Types.ObjectId.isValid(d));
+            const nameDepts = departmentsArray.filter((d) => !mongoose.Types.ObjectId.isValid(d));
+
+            const orConditions: any[] = [];
+            if (objectIdDepts.length > 0) orConditions.push({ _id: { $in: objectIdDepts } });
+            if (nameDepts.length > 0) orConditions.push({ name: { $in: nameDepts.map(n => new RegExp(`^${n}$`, "i")) } });
+
+            const foundDepartments = await Department.find({
+                ...(orConditions.length > 1 ? { $or: orConditions } : (orConditions[0] || {})),
+                examType,
+                isActive: true,
+            }).select("_id name");
+
+            if (foundDepartments.length > 0) {
+                query.departments = { $in: foundDepartments.map((d) => d._id) };
+            }
+        }
+
+        if (subjectsArray && subjectsArray.length > 0) {
+            const objectIdSubjects = subjectsArray.filter((s) => mongoose.Types.ObjectId.isValid(s));
+            const nameSubjects = subjectsArray.filter((s) => !mongoose.Types.ObjectId.isValid(s));
+
+            const orConditions: any[] = [];
+            if (objectIdSubjects.length > 0) orConditions.push({ _id: { $in: objectIdSubjects } });
+            if (nameSubjects.length > 0) orConditions.push({ name: { $in: nameSubjects.map(n => new RegExp(`^${n}$`, "i")) } });
+
+            const foundSubjects = await Subject.find({
+                ...(orConditions.length > 1 ? { $or: orConditions } : (orConditions[0] || {})),
+                isActive: true,
+            }).select("_id name");
+
+            if (foundSubjects.length > 0) {
+                const subIds = foundSubjects.map((s) => s._id);
+                query.$or = [
+                    { subject: { $in: subIds } },
+                    { subjects: { $in: subIds } }
+                ];
+            }
+        }
+
         if (input.year) query.year = Number(input.year);
-        console.log({ query })
         return query;
     }
 
