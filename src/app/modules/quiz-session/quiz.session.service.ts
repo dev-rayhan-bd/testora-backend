@@ -428,7 +428,7 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
     const isEntitledForPlan = entitlements.purchasedPlans.includes(user.plan as string);
     if (!entitlements.hasActiveSubscription || !isEntitledForPlan) {
       const freeTestForYear = await Test.findOne({
-        examType: user.plan,
+        examType: user.plan as any,
         year: Number(year),
         access: "free",
         isActive: true,
