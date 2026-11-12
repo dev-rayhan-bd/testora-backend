@@ -1,6 +1,7 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
+import 'multer';
 import cloudinary from '../../config/cloudinary.config';
 import config from '../../config';
 import { getCloudinaryPublicId } from '../cloudinary/getCoudinaryPublicId';
