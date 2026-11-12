@@ -1,8 +1,9 @@
 import csv from "csv-parser";
 import mongoose from "mongoose";
 import { Readable } from "stream";
-import { EXAM_TYPES, TAccessTypes, TExamTypes } from "../../../interfaces";
+import { ACCESS_TYPES, EXAM_TYPES, TAccessTypes, TExamTypes } from "../../../interfaces";
 import { BadRequestError } from "../../errors/request/apiError";
+import { getUserEntitlements, isUserEntitledToTest } from "../../../helpers/entitlements";
 import Department from "../department/department.model";
 import Faculty from "../faculty/faculty.model";
 import Passage from "../passage/passage.model";
@@ -236,6 +237,7 @@ export const getPaginatedTestsByType = async (
         language?: string;
         page?: number;
         limit?: number;
+        user?: any;
     }
 ) => {
     const page = Number(input.page) || 1;
@@ -309,13 +311,15 @@ export const getPaginatedTestsByType = async (
 
     const [tests, total] = await Promise.all([
         Test.find(query)
-            .select("access title totalQuestions subjects year")
+            .select("access title totalQuestions subjects year faculty examType")
             .sort({ year: -1, createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean(),
         Test.countDocuments(query),
     ]);
+
+    const entitlements = input.user ? await getUserEntitlements(input.user) : null;
 
     const subjectsList = await Subject.find({ _id: { $in: tests.flatMap(test => (test as any).subjects || []) }, examType: input.examType as TExamTypes })
         .select("_id name nameInEnglish nameInAlbanian")
@@ -326,6 +330,8 @@ export const getPaginatedTestsByType = async (
     const formattedTests = tests.map((test: any) => {
 
     const testSubjectIds = test.subjects?.map((id: any) => id.toString()) || [];
+    const isEntitled = entitlements ? isUserEntitledToTest(entitlements, test) : false;
+    const isLock = test.access === ACCESS_TYPES.FREE || test.access === "free" ? false : !isEntitled;
 
         return {
             testId: test._id,
@@ -340,7 +346,7 @@ export const getPaginatedTestsByType = async (
                 })),
             totalSubjects: test.subjects?.length || 0,
             access: test.access,
-            isLock: test.access === "premium",
+            isLock,
             year: test.year,
         };
     });

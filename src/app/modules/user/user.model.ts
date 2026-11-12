@@ -67,6 +67,11 @@ export const userSchema = new Schema<IUser>(
       default: USER_STATUS.PENDING,
     },
     faculty: { type: String, default: null },
+    purchasedFaculties: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Faculty',
+      default: []
+    }],
     subscription: {
       type: Schema.Types.ObjectId,
       ref: 'Subscription',

@@ -29,6 +29,7 @@ export interface IUser extends Document {
   };
   plan?: string;
   faculty?: string;
+  purchasedFaculties?: Types.ObjectId[];
   subscription?: Types.ObjectId;
   language?: TUserLanguages;
   role: TUserRole;

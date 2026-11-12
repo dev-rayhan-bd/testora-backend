@@ -41,15 +41,18 @@ const getAllOfficialTestsIntoDb = asyncHandler(async (req: Request, res: Respons
   const { page, limit } = req.query;
   const rawDept = req.query.departments || req.query.department || req.query.departmentId;
   const departments = rawDept ? (Array.isArray(rawDept) ? rawDept : [rawDept]) : undefined;
+  const examType = (req.query.examType as string) || (req.user.plan as string);
+  const faculty = (req.query.faculty as string) || (req.user.faculty as string);
 
   const result = await testService.getAllOfficialTests(
     {
-      examType: req.user.plan as string,
-      faculty: req.user.faculty as string,
+      examType,
+      faculty,
       departments: departments as string[],
       language: req.user.language as string,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      user: req.user,
     } as any);
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -64,14 +67,17 @@ const getAllAdditionalTestsIntoDb = asyncHandler(async (req: Request, res: Respo
   const { page, limit } = req.query;
   const rawDept = req.query.departments || req.query.department || req.query.departmentId;
   const departments = rawDept ? (Array.isArray(rawDept) ? rawDept : [rawDept]) : undefined;
+  const examType = (req.query.examType as string) || (req.user.plan as string);
+  const faculty = (req.query.faculty as string) || (req.user.faculty as string);
 
   const result = await testService.getAllAdditionalTests({
-    examType: req.user.plan as string,
-    faculty: req.user.faculty as string,
+    examType,
+    faculty,
     departments: departments as string[],
     language: req.user.language as string,
     page: page ? Number(page) : 1,
     limit: limit ? Number(limit) : 20,
+    user: req.user,
   } as any);
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -85,7 +91,7 @@ const getAllAdditionalTestsIntoDb = asyncHandler(async (req: Request, res: Respo
 const getQuestionsByTestIdIntoDb = asyncHandler(async (req: Request, res: Response) => {
   const { testId } = req.params;
 
-  const result = await testService.getQuestionsByTestId(testId as string, req.query);
+  const result = await testService.getQuestionsByTestId(testId as string, req.query, req.user);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -103,7 +109,9 @@ const getQuestionsByTestIdIntoDb = asyncHandler(async (req: Request, res: Respon
 
 
 const getYearRange = asyncHandler(async (req: Request, res: Response) => {
-  const result = await testService.getYearRange(req.user.plan as string);
+  const plan = (req.query.plan as string) || (req.query.examType as string) || (req.user.plan as string);
+  const faculty = (req.query.faculty as string) || (req.user.faculty as string);
+  const result = await testService.getYearRange(plan, req.user, faculty);
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,

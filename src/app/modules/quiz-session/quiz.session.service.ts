@@ -1,7 +1,8 @@
 
 import { Types } from "mongoose";
 import { TExamTypes, EXAM_TYPES } from "../../../interfaces";
-import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../../errors/request/apiError";
+import { getUserEntitlements, isUserEntitledToTest } from "../../../helpers/entitlements";
 import Question from "../question/question.model";
 import Subscription from "../subscription/subscription.model";
 import Test from "../test/test.model";
@@ -250,15 +251,6 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
     );
   }
 
-  // ── Subscription check ──
-  const now = new Date();
-  const subscription = await Subscription.findOne({
-    user: user._id,
-    status: "active",
-    endDate: { $gt: now },
-  });
-  const isPremium = !!subscription;
-
   // ── Test khuje validate koro ──
   const test = await Test.findOne({
     _id: new Types.ObjectId(testId),
@@ -269,9 +261,12 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
     throw new NotFoundError("Test not found.");
   }
 
-
-  if (!isPremium && test.access === "premium") {
-    throw new BadRequestError("This test requires a premium subscription.");
+  // ── 5-Tier Entitlement Guard ──
+  if (test.access === "premium") {
+    const entitlements = await getUserEntitlements(user);
+    if (!isUserEntitledToTest(entitlements, test as any)) {
+      throw new ForbiddenError("Upgrade your plan to access this content.");
+    }
   }
 
   // ── Test-er testIds array e current test._id ase emon question khujo ──
@@ -410,14 +405,41 @@ const startQuiz = async (user: IUser, payload: TQuizSessionPayload) => {
     );
   }
 
-  // ── Subscription check ──
-  const now = new Date();
-  const subscription = await Subscription.findOne({
-    user: user._id,
-    status: "active",
-    endDate: { $gt: now },
-  });
-  const isPremium = !!subscription;
+  // ── 5-Tier Entitlement Guard ──
+  const entitlements = await getUserEntitlements(user);
+
+  // If provime, verify user is entitled to this faculty
+  if (user.plan === EXAM_TYPES.ENTRANCE_EXAM || user.plan === "provime" || facultyId) {
+    const targetFaculty = facultyId || user.faculty;
+    if (targetFaculty) {
+      const isEntitledFaculty = isUserEntitledToTest(entitlements, {
+        access: "premium",
+        examType: EXAM_TYPES.ENTRANCE_EXAM,
+        faculty: targetFaculty,
+      });
+      if (entitlements.hasActiveSubscription && !isEntitledFaculty) {
+        throw new ForbiddenError("Upgrade your plan to access this content.");
+      }
+    }
+  }
+
+  // If year is specified and user has no active entitlement for this plan
+  if (year) {
+    const isEntitledForPlan = entitlements.purchasedPlans.includes(user.plan as string);
+    if (!entitlements.hasActiveSubscription || !isEntitledForPlan) {
+      const freeTestForYear = await Test.findOne({
+        examType: user.plan,
+        year: Number(year),
+        access: "free",
+        isActive: true,
+      });
+      if (!freeTestForYear) {
+        throw new ForbiddenError("Upgrade your plan to access this content.");
+      }
+    }
+  }
+
+  const isPremium = entitlements.hasActiveSubscription && entitlements.purchasedPlans.includes(user.plan as string);
 
   // ── Seen questions — completed + expired থেকে ──
   const seenAgg = await QuizSession.aggregate([

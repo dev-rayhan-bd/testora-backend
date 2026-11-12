@@ -1,7 +1,10 @@
 import mongoose, { Types } from "mongoose";
 import withTransaction from "../../../helpers/withTransaction";
-import { EXAM_TYPES, TAccessTypes, TEST_TYPES, TExamTypes, TTestTypes } from "../../../interfaces";
-import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
+import { ACCESS_TYPES, EXAM_TYPES, TAccessTypes, TEST_TYPES, TExamTypes, TTestTypes } from "../../../interfaces";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../../errors/request/apiError";
+import { getUserEntitlements, isUserEntitledToTest } from "../../../helpers/entitlements";
+import { IUser } from "../user/user.interface";
+import Faculty from "../faculty/faculty.model";
 import Question from "../question/question.model";
 import Subject from "../subject/subject.model";
 import { ITest } from "./test.interface";
@@ -304,6 +307,7 @@ const getAllOfficialTests = async (input: {
   language?: string;
   page?: number;
   limit?: number;
+  user?: any;
 }) => {
   return getPaginatedTestsByType(TEST_TYPES.OFFICIAL, input);
 };
@@ -315,57 +319,102 @@ const getAllAdditionalTests = async (input: {
   language?: string;
   page?: number;
   limit?: number;
+  user?: any;
 }) => {
   return getPaginatedTestsByType(TEST_TYPES.ADDITIONAL, input);
 };
 
-// get year range for all tests
-const getYearRange = async (plan: string) => {
-  console.log({ plan });
+// get year range for all tests respecting active plan & faculty entitlements
+const getYearRange = async (plan: string, user?: IUser, faculty?: string) => {
+  console.log({ plan, faculty });
+  const matchQuery: any = {
+    examType: plan,
+    isActive: true,
+  };
+
+  let resolvedFacultyId: string | null = null;
+  if (plan === EXAM_TYPES.ENTRANCE_EXAM && faculty) {
+    if (mongoose.Types.ObjectId.isValid(faculty)) {
+      resolvedFacultyId = faculty;
+      matchQuery.faculty = new mongoose.Types.ObjectId(faculty);
+    } else {
+      const facultyDoc = await Faculty.findOne({
+        name: { $regex: new RegExp(`^${faculty.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+      }).select("_id");
+      if (facultyDoc) {
+        resolvedFacultyId = facultyDoc._id.toString();
+        matchQuery.faculty = facultyDoc._id;
+      }
+    }
+  }
+
   const result = await Test.aggregate([
     {
-
-      $match: {
-        examType: plan
-      }
+      $match: matchQuery,
     },
     {
-  
       $group: {
         _id: {
           year: "$year",
-          access: "$access"
-        }
-      }
+          access: "$access",
+        },
+      },
     },
     {
-
       $project: {
         _id: 0,
         year: "$_id.year",
-        access: "$_id.access"
-      }
+        access: "$_id.access",
+      },
     },
     {
-      $sort: { year: 1, access: 1 }
-    }
+      $sort: { year: 1, access: 1 },
+    },
   ]);
 
-  return result;
+  const entitlements = user ? await getUserEntitlements(user) : null;
+  const isEntitled = entitlements
+    ? isUserEntitledToTest(entitlements, {
+        access: ACCESS_TYPES.PREMIUM,
+        examType: plan,
+        faculty: resolvedFacultyId || faculty,
+      })
+    : false;
+
+  return result.map((item: any) => {
+    const isFree = item.access === "free" || isEntitled;
+    return {
+      year: item.year,
+      access: isFree ? "free" : "premium",
+      isLock: !isFree,
+    };
+  });
 };
 
 // get Question by test id with pagination and optional department filter
 const getQuestionsByTestId = async (
   testId: string,
-  input: { page?: number; limit?: number; searchTerm?: string }
+  input: { page?: number; limit?: number; searchTerm?: string },
+  user?: IUser
 ) => {
   const page = input.searchTerm ? 1 : Number(input.page) || 1;
   const limit = Number(input.limit) || 20;
   const skip = (page - 1) * limit;
   const searchTerm = input.searchTerm?.trim();
 
-  const test = await Test.findById(testId).select("title examType").lean();
+  const test = await Test.findById(testId).select("title examType access faculty").lean();
   if (!test) throw new NotFoundError("Test not found");
+
+  // Entitlement guard for premium tests
+  if (test.access === ACCESS_TYPES.PREMIUM) {
+    if (!user) {
+      throw new ForbiddenError("Upgrade your plan to access this content.");
+    }
+    const entitlements = await getUserEntitlements(user);
+    if (!isUserEntitledToTest(entitlements, test)) {
+      throw new ForbiddenError("Upgrade your plan to access this content.");
+    }
+  }
 
   const targetTestId = new mongoose.Types.ObjectId(testId);
 

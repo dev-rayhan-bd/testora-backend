@@ -1,7 +1,9 @@
+import { Types } from 'mongoose';
 import { randomUserImage } from '../../../utilities/randomUserImage';
 import { deleteImageFromCloudinary } from '../../cloudinary/deleteImageFromCloudinary';
 import { uploadToCloudinary } from '../../cloudinary/uploadImageToCLoudinary';
 import { BadRequestError } from '../../errors/request/apiError';
+import { getUserEntitlements } from '../../../helpers/entitlements';
 
 import { sendVerificationOtp } from '../auth/auth.utils';
 import { USER_ROLE, USER_STATUS } from './user.constant';
@@ -147,17 +149,21 @@ const updateUserProfile = async (user: IUser, payload: TUserProfileUpdatePayload
 };
 
 const getUserProfile = async (user: IUser) => {
+  const entitlements = await getUserEntitlements(user);
+
   return {
     fullName: user.fullName,
     email: user.email,
     city: user.city,
     avatar: user.avatar,
-    plan: user.plan,
+    plan: user.plan || null,
     language: user.language,
-    planStatus: user.subscription || null,
+    planStatus: entitlements.planStatus,
+    purchasedPlans: entitlements.purchasedPlans,
+    purchasedFaculties: entitlements.purchasedFaculties,
+    subscriptionExpiresAt: entitlements.subscriptionExpiresAt,
   };
-}
-
+};
 
 const choosePlan = async (user: IUser, payload: { plan: string, faculty?: string }) => {
   user.plan = payload.plan;
@@ -167,6 +173,13 @@ const choosePlan = async (user: IUser, payload: { plan: string, faculty?: string
       throw new BadRequestError('Faculty not found with the provided ID.');
     }
     user.faculty = facultyDoc.name;
+    if (!user.purchasedFaculties) {
+      user.purchasedFaculties = [];
+    }
+    const facultyObjId = facultyDoc._id as Types.ObjectId;
+    if (!user.purchasedFaculties.some((id: any) => id.toString() === facultyObjId.toString())) {
+      user.purchasedFaculties.push(facultyObjId);
+    }
   } else if (payload.plan !== 'provime') {
     user.faculty = undefined;
   }
