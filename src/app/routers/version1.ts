@@ -128,6 +128,14 @@ const appRouters = [
     path: '/test-archive',
     router: testRouter,
   },
+  {
+    path: '/test',
+    router: testRouter,
+  },
+  {
+    path: '/tests',
+    router: testRouter,
+  },
 
   {
     path: '/quiz',
