@@ -10,72 +10,144 @@ const getExamReadiness = async (user: IUser) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // All-time completed sessions for study stats widget
-    const allCompletedSessions = await QuizSession.find({
+    // Fetch all completed sessions for this user & plan
+    const completedSessions = await QuizSession.find({
         user: user._id,
         examType: user.plan as TExamTypes,
         status: QUIZ_STATUS.COMPLETED,
-    }).select("correctCount totalQuestions completedAt").lean();
+    })
+    .select("correctCount totalQuestions completedAt startedAt durationSeconds testId attempts")
+    .sort({ completedAt: 1 })
+    .lean();
 
-    const totalCompletedQuizzes = allCompletedSessions.length;
-
-    // Overall accuracy
-    const allTotalCorrect = (allCompletedSessions as any[]).reduce((sum, s) => sum + (s.correctCount || 0), 0);
-    const allTotalQuestions = (allCompletedSessions as any[]).reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
-    const accuracyPercent = allTotalQuestions > 0 ? Math.round((allTotalCorrect / allTotalQuestions) * 100) : 0;
-
-    // Best score % across completed quizzes
-    let bestScore = 0;
-    for (const s of allCompletedSessions as any[]) {
-        if (s.totalQuestions > 0) {
-            const score = Math.round(((s.correctCount || 0) / s.totalQuestions) * 100);
-            if (score > bestScore) bestScore = score;
-        }
-    }
-
-    // Active days count (distinct calendar dates with completed quizzes)
-    const activeDaysSet = new Set<string>();
-    for (const s of allCompletedSessions as any[]) {
-        if (s.completedAt) {
-            const dateStr = new Date(s.completedAt).toISOString().split('T')[0];
-            activeDaysSet.add(dateStr);
-        }
-    }
-    const activeDays = activeDaysSet.size;
-
-    // Recent 7-day sessions for exam readiness calculation
-    const recentSessions = (allCompletedSessions as any[]).filter(
+    const recentSessions = (completedSessions as any[]).filter(
         (s) => s.completedAt && new Date(s.completedAt) >= sevenDaysAgo
     );
 
-    if (recentSessions.length === 0) {
-        return {
-            readinessPercent: null,
-            isCalculated: false,
-            totalQuizzes: 0,
-            basedOn: "last 7 days",
-            totalCompletedQuizzes,
-            accuracyPercent,
-            quizAccuracy: accuracyPercent,
-            bestScore,
-            activeDays,
-        };
+    // 1. Stats calculation (last 7 days activity, fallback to completed if no recent)
+    const targetSessions = recentSessions.length > 0 ? recentSessions : completedSessions;
+    const questionsPracticed = (targetSessions as any[]).reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
+    const correctAnswers = (targetSessions as any[]).reduce((sum, s) => sum + (s.correctCount || 0), 0);
+
+    let studyTimeSeconds = 0;
+    for (const s of targetSessions as any[]) {
+        if (s.completedAt && s.startedAt) {
+            const timeDiff = Math.max(0, Math.floor((new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000));
+            studyTimeSeconds += (s.durationSeconds && s.durationSeconds < 86400) ? Math.min(timeDiff, s.durationSeconds) : timeDiff;
+        } else if (s.durationSeconds && s.durationSeconds < 86400) {
+            studyTimeSeconds += s.durationSeconds;
+        }
+    }
+    const hours = Math.floor(studyTimeSeconds / 3600);
+    const minutes = Math.floor((studyTimeSeconds % 3600) / 60);
+    const studyTimeFormatted = `${hours}h ${minutes}m`;
+
+    const mockTestsCompleted = (targetSessions as any[]).filter((s) => s.testId).length;
+
+    // 2. Readiness percent
+    const readinessPercent = questionsPracticed > 0 ? Math.round((correctAnswers / questionsPracticed) * 100) : 0;
+
+    // 3. Feedback message
+    let feedbackMessage = "You are making good progress. Focus more on weak subjects to improve your score.";
+    if (readinessPercent >= 80) {
+        feedbackMessage = "Excellent preparation! Keep maintaining this consistency to achieve top scores.";
+    } else if (readinessPercent >= 60) {
+        feedbackMessage = "You are making good progress. Focus more on weak subjects to improve your score.";
+    } else if (readinessPercent >= 40) {
+        feedbackMessage = "Steady progress. Increase daily practice and review difficult topics.";
+    } else if (readinessPercent > 0) {
+        feedbackMessage = "Keep practicing daily to build your confidence and readiness.";
+    } else {
+        feedbackMessage = "Start practicing quizzes to calculate your exam readiness score.";
     }
 
-    const totalCorrect = recentSessions.reduce((sum, s) => sum + (s.correctCount || 0), 0);
-    const totalQuestions = recentSessions.reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
-    const readinessPercent = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+    // 4. Subject performance from attempts
+    const subjectMap: Record<string, { total: number; correct: number }> = {};
+    for (const s of (completedSessions as any[])) {
+        if (s.attempts && Array.isArray(s.attempts)) {
+            for (const att of s.attempts) {
+                if (att.subjectId) {
+                    const subId = att.subjectId.toString();
+                    if (!subjectMap[subId]) {
+                        subjectMap[subId] = { total: 0, correct: 0 };
+                    }
+                    subjectMap[subId].total += 1;
+                    if (att.isCorrect) {
+                        subjectMap[subId].correct += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let subjects = await Subject.find({
+        examType: user.plan as TExamTypes,
+        $or: [{ isActive: true }, { isActive: { $exists: false } }],
+    })
+    .select("_id name nameInEnglish nameInAlbanian")
+    .lean();
+
+    if (subjects.length === 0) {
+        subjects = await Subject.find({
+            examType: user.plan as TExamTypes,
+        })
+        .select("_id name nameInEnglish nameInAlbanian")
+        .lean();
+    }
+
+    const subjectPerformance = (subjects as any[]).map((sub) => {
+        const stats = subjectMap[sub._id.toString()] || { total: 0, correct: 0 };
+        const percent = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+        const name = user.language === "english" ? (sub.nameInEnglish || sub.name) : (sub.nameInAlbanian || sub.name);
+        return {
+            subjectId: sub._id.toString(),
+            name,
+            percent,
+        };
+    });
+
+    // 5. Recent progress (last 7 days)
+    const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+    const recentProgress = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dateStr = d.toISOString().split("T")[0];
+        const dayLabel = dayLabels[d.getDay()];
+
+        const daySessions = (completedSessions as any[]).filter((s) => {
+            if (!s.completedAt) return false;
+            return new Date(s.completedAt).toISOString().split("T")[0] === dateStr;
+        });
+
+        const dayQuestions = daySessions.reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
+        const dayCorrect = daySessions.reduce((sum, s) => sum + (s.correctCount || 0), 0);
+        const scorePercent = dayQuestions > 0 ? Math.round((dayCorrect / dayQuestions) * 100) : 0;
+
+        recentProgress.push({
+            day: dayLabel,
+            date: dateStr,
+            scorePercent,
+            questionsCount: dayQuestions,
+        });
+    }
 
     return {
         readinessPercent,
-        isCalculated: true,
+        feedbackMessage,
+        stats: {
+            questionsPracticed,
+            correctAnswers,
+            studyTimeSeconds,
+            studyTimeFormatted,
+            mockTestsCompleted,
+        },
+        subjectPerformance,
+        recentProgress,
+        isCalculated: questionsPracticed > 0,
         totalQuizzes: recentSessions.length,
         basedOn: "last 7 days",
-        totalCompletedQuizzes,
-        accuracyPercent,
-        quizAccuracy: accuracyPercent,
-        bestScore,
-        activeDays,
     };
 };
 

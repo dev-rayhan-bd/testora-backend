@@ -105,6 +105,11 @@ const appRouters = [
   },
 
   {
+    path: '/home',
+    router: homeDashboardRouter,
+  },
+
+  {
     path: '/subject',
     router: subjectRouter,
   },

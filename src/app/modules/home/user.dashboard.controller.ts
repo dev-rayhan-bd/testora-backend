@@ -11,7 +11,7 @@ const getExamReadiness = asyncHandler(async (req: Request, res: Response) => {
     sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
-        message: 'Exam readiness data fetched successfully',
+        message: 'Exam readiness report retrieved successfully',
         data: result,
     });
 });
