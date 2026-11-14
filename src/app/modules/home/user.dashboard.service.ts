@@ -262,29 +262,81 @@ const getInProgressSessions = async (user: IUser) => {
         examType: user.plan as TExamTypes,
         status: { $in: [QUIZ_STATUS.IN_PROGRESS] },
     })
-        .select("title testId examType subjectIds mode durationSeconds startedAt currentIndex totalQuestions attempts status questionIds")
-        .populate("testId", "title year")
+        .select("title testId examType subjectIds mode durationSeconds startedAt currentIndex totalQuestions attempts status questionIds updatedAt")
+        .populate({
+            path: "testId",
+            select: "title year mandatorySubjects electiveSubjects",
+            populate: [
+                { path: "mandatorySubjects", select: "name nameInEnglish nameInAlbanian" },
+                { path: "electiveSubjects", select: "name nameInEnglish nameInAlbanian" },
+            ],
+        })
         .populate("subjectIds", "name nameInEnglish nameInAlbanian")
         .sort({ updatedAt: -1 })
-        .limit(5)
         .lean();
 
-    const result = (sessions as any[]).map((s) => {
+    // Group by testId + elective subject combination to only display the latest attempt
+    const seenCombinations = new Set<string>();
+    const uniqueSessions: any[] = [];
+
+    for (const s of sessions as any[]) {
         const isUntimed = s.mode === "untimed" || s.durationSeconds >= 86400;
         const expireAt = new Date(s.startedAt).getTime() + s.durationSeconds * 1000;
         const remainingSeconds = isUntimed ? 0 : Math.max(0, (expireAt - now.getTime()) / 1000);
 
         const isExpired = !isUntimed && (s.status === QUIZ_STATUS.EXPIRED || remainingSeconds <= 0);
+        if (isExpired) {
+            continue; // Skip expired sessions
+        }
 
-        // Subject names formatted by user language
-        const subjectNames = (s.subjectIds as any[])
-            ? (s.subjectIds as any[])
-                .map((sub: any) => (user.language === 'english' ? sub.nameInEnglish : sub.nameInAlbanian) || sub.name)
+        // Generate combination key
+        let comboKey = s._id.toString();
+        if (s.testId?._id) {
+            const sortedSubjects = (s.subjectIds || [])
+                .map((sub: any) => (sub._id ? sub._id.toString() : sub.toString()))
+                .sort()
+                .join("_");
+            comboKey = `${s.testId._id}_${sortedSubjects}`;
+        }
+
+        if (seenCombinations.has(comboKey)) {
+            continue; // Keep only latest attempt for this combination
+        }
+        seenCombinations.add(comboKey);
+        uniqueSessions.push({ ...s, remainingSeconds, isUntimed, isExpired });
+
+        if (uniqueSessions.length >= 5) break;
+    }
+
+    const result = uniqueSessions.map((s) => {
+        const testDoc = s.testId as any;
+        const subjectsList = (s.subjectIds as any[]) || [];
+
+        // Check if elective subject exists in this test
+        let electiveSubjectName = "";
+        if (testDoc && testDoc.electiveSubjects && Array.isArray(testDoc.electiveSubjects)) {
+            const electiveDocs = testDoc.electiveSubjects as any[];
+            const electiveSubjectIds = electiveDocs.map((es) => es._id?.toString() || es.toString());
+            const matchedElective = subjectsList.find((sub: any) =>
+                electiveSubjectIds.includes(sub._id ? sub._id.toString() : sub.toString())
+            );
+            if (matchedElective) {
+                electiveSubjectName = user.language === "albanian"
+                    ? (matchedElective.nameInAlbanian || matchedElective.name)
+                    : (matchedElective.nameInEnglish || matchedElective.name);
+            }
+        }
+
+        let title = s.title;
+        if (testDoc?.title) {
+            title = electiveSubjectName ? `${testDoc.title} – ${electiveSubjectName}` : testDoc.title;
+        } else if (!title) {
+            const subjectNames = subjectsList
+                .map((sub: any) => (user.language === "albanian" ? sub.nameInAlbanian : sub.nameInEnglish) || sub.name)
                 .filter(Boolean)
-                .join(", ")
-            : "";
-
-        const title = (s.testId as any)?.title || s.title || (subjectNames ? subjectNames : `${s.examType}`);
+                .join(", ");
+            title = subjectNames ? subjectNames : `${s.examType}`;
+        }
 
         // Find the first unanswered question index
         const answeredQuestionSet = new Set((s.attempts || []).map((a: any) => a.questionId.toString()));
@@ -302,14 +354,14 @@ const getInProgressSessions = async (user: IUser) => {
             sessionId: s._id,
             title,
             examType: s.examType,
-            status: isExpired ? "expired" : "in_progress",
+            status: s.isExpired ? "expired" : "in_progress",
             currentIndex: s.currentIndex,
             nextUnansweredIndex,
             answeredCount: (s.attempts || []).length,
             totalQuestions: s.totalQuestions,
-            remainingSeconds: isUntimed ? 0 : (isExpired ? 0 : Math.floor(remainingSeconds)),
-            isUntimed,
-            mode: s.mode || (isUntimed ? "untimed" : "timed"),
+            remainingSeconds: s.isUntimed ? 0 : Math.floor(s.remainingSeconds),
+            isUntimed: s.isUntimed,
+            mode: s.mode || (s.isUntimed ? "untimed" : "timed"),
             startedAt: s.startedAt,
         };
     });

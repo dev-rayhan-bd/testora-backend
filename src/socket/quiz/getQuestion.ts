@@ -69,24 +69,41 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
       ? index + 1 === passageMapEntry.start   // start 1-based
       : false;
 
+    const pImg = isFirstOfPassage ? (passageObj.passageImageUrl ?? null) : null;
     passageData = {
       _id: passageObj._id,
       passageCode: passageObj.passageCode ?? null,
       title: isFirstOfPassage ? (passageObj.title ?? null) : null,
       content: isFirstOfPassage ? (passageObj.content ?? null) : null,
-      passageImageUrl: isFirstOfPassage ? (passageObj.passageImageUrl ?? null) : null,
+      passageImageUrl: pImg,
+      passageImage: pImg,
+      imageUrl: pImg,
       questionRange: passageMapEntry
         ? { from: passageMapEntry.start, to: passageMapEntry.end }
         : null,
     };
   }
 
+  const qImg = question.questionImageUrl ?? null;
+  const expImg = (question as any).explanationImageUrl ?? null;
+  const options = (question.options || []).map((opt: any) => ({
+    text: opt.text || "",
+    imageUrl: opt.imageUrl ?? null,
+    optionImage: opt.imageUrl ?? null,
+    optionImageUrl: opt.imageUrl ?? null,
+  }));
+
   return {
     index,
     totalQuestions: session.totalQuestions,
     questionId: question._id,
     questionText: question.questionText,
-    questionImage: question.questionImageUrl ?? null,
+    questionImage: qImg,
+    questionImageUrl: qImg,
+    imageUrl: qImg,
+    explanation: (question as any).explanation ?? null,
+    explanationImageUrl: expImg,
+    explanationImage: expImg,
     subjectName: (question.subject as any)?.name ?? null,
     subject: question.subject ? {
       _id: (question.subject as any)._id,
@@ -95,7 +112,7 @@ const getQuestion = async (sessionId: string, userId: Types.ObjectId, index: num
       nameInAlbanian: (question.subject as any).nameInAlbanian,
       slug: (question.subject as any).slug,
     } : null,
-    options: question.options,
+    options,
     passage: passageData,
     selectedOptionIndex: existingAttempt?.selectedOptionIndex ?? null,
     isMarked,

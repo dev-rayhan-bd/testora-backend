@@ -240,22 +240,14 @@ const getMandatorySubjects = async (user: IUser, testId: string) => {
 
 // start full simulation quiz
 const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFullSimulationPayload) => {
-
-  const existing = await QuizSession.find({
-    user: user._id,
-    status: QUIZ_STATUS.IN_PROGRESS,
-  });
-  if (existing.length > 3) {
-    throw new BadRequestError(
-      "You already have many active quiz sessions. Please complete or wait for them to expire."
-    );
-  }
-
   // ── Test khuje validate koro ──
   const test = await Test.findOne({
     _id: new Types.ObjectId(testId),
     isActive: true,
-  }).lean();
+  })
+    .populate("mandatorySubjects", "name nameInEnglish nameInAlbanian")
+    .populate("electiveSubjects", "name nameInEnglish nameInAlbanian")
+    .lean();
 
   if (!test) {
     throw new NotFoundError("Test not found.");
@@ -267,6 +259,69 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
     if (!isUserEntitledToTest(entitlements, test as any)) {
       throw new ForbiddenError("Upgrade your plan to access this content.");
     }
+  }
+
+  const requestedSubjectIds = (payload.subjects || []).map((id) => new Types.ObjectId(id));
+  const requestedSubjectIdStrs = requestedSubjectIds.map((id) => id.toString());
+
+  // Determine elective subject chosen, if any
+  let electiveSubjectName = "";
+  if (test.electiveSubjects && Array.isArray(test.electiveSubjects)) {
+    const electiveDocs = test.electiveSubjects as any[];
+    const matchedElectiveDoc = electiveDocs.find((es) =>
+      requestedSubjectIdStrs.includes(es._id?.toString() || es.toString())
+    );
+    if (matchedElectiveDoc) {
+      electiveSubjectName = user.language === "albanian"
+        ? (matchedElectiveDoc.nameInAlbanian || matchedElectiveDoc.name)
+        : (matchedElectiveDoc.nameInEnglish || matchedElectiveDoc.name);
+    }
+  }
+
+  const sessionTitle = electiveSubjectName ? `${test.title} – ${electiveSubjectName}` : test.title;
+
+  // ── Check if an unfinished session already exists for this exact test & subject combination ──
+  const existingSameCombo = await QuizSession.findOne({
+    user: user._id,
+    testId: test._id,
+    status: QUIZ_STATUS.IN_PROGRESS,
+    ...(requestedSubjectIds.length > 0 ? { subjectIds: { $all: requestedSubjectIds, $size: requestedSubjectIds.length } } : {}),
+  }).sort({ updatedAt: -1 });
+
+  if (existingSameCombo) {
+    const now = new Date();
+    const isUntimedExisting = existingSameCombo.mode === "untimed" || existingSameCombo.durationSeconds >= 86400;
+    const expireAt = new Date(existingSameCombo.startedAt).getTime() + existingSameCombo.durationSeconds * 1000;
+    const remainingSeconds = isUntimedExisting ? 0 : Math.max(0, Math.floor((expireAt - now.getTime()) / 1000));
+
+    if (isUntimedExisting || remainingSeconds > 0) {
+      // Resume existing unfinished attempt
+      return {
+        sessionId: existingSameCombo._id,
+        title: existingSameCombo.title || sessionTitle,
+        totalQuestions: existingSameCombo.totalQuestions,
+        durationSeconds: existingSameCombo.durationSeconds,
+        remainingSeconds,
+        isUntimed: isUntimedExisting,
+        mode: existingSameCombo.mode || (isUntimedExisting ? "untimed" : "timed"),
+        currentIndex: existingSameCombo.currentIndex,
+        currentQuestionId: existingSameCombo.questionIds[existingSameCombo.currentIndex] || existingSameCombo.questionIds[0],
+        isResumed: true,
+      };
+    } else {
+      existingSameCombo.status = QUIZ_STATUS.EXPIRED;
+      await existingSameCombo.save();
+    }
+  }
+
+  const activeCount = await QuizSession.countDocuments({
+    user: user._id,
+    status: QUIZ_STATUS.IN_PROGRESS,
+  });
+  if (activeCount >= 5) {
+    throw new BadRequestError(
+      "You already have many active quiz sessions. Please complete or wait for them to expire."
+    );
   }
 
   // ── Test-er testIds array e current test._id ase emon question khujo ──
@@ -356,9 +411,10 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
   const session = await QuizSession.create({
     user: user._id,
     testId: test._id,
-    title: test.title,
+    title: sessionTitle,
     mode: isUntimed ? "untimed" : "timed",
     examType: user.plan as TExamTypes,
+    subjectIds: requestedSubjectIds,
     questionIds,
     totalQuestions,
     durationSeconds,
@@ -374,7 +430,7 @@ const startFullSimulationQuiz = async (user: IUser, testId: string, payload: TFu
 
   return {
     sessionId: (session as any)._id,
-    title: test.title,
+    title: sessionTitle,
     totalQuestions,
     durationSeconds,
     remainingSeconds: isUntimed ? 0 : durationSeconds,
@@ -753,15 +809,26 @@ const getQuestionReview = async (sessionId: string, userId: Types.ObjectId, inde
   );
 
   console.log({ question, attempt })
+  const qImg = question.questionImageUrl ?? null;
+  const expImg = question.explanationImageUrl ?? null;
+  const options = (question.options || []).map((opt: any) => ({
+    text: opt.text || "",
+    imageUrl: opt.imageUrl ?? null,
+    optionImage: opt.imageUrl ?? null,
+    optionImageUrl: opt.imageUrl ?? null,
+  }));
+
   return {
     index,
     questionText: question.questionText,
-    questionImage: question.questionImageUrl ?? null,
-    options: question.options,
+    questionImage: qImg,
+    questionImageUrl: qImg,
+    imageUrl: qImg,
+    options,
     correctOptionIndex: question.correctOptionIndex,
     explanation: question.explanation ?? null,
-    explanationImageUrl: question.explanationImageUrl ?? null,
-    explanationImage: question.explanationImageUrl ?? null,
+    explanationImageUrl: expImg,
+    explanationImage: expImg,
     selectedOptionIndex: attempt?.selectedOptionIndex ?? null,
     status: !attempt
       ? "unanswered"

@@ -394,13 +394,20 @@ const getYearRange = async (plan: string, user?: IUser, faculty?: string) => {
 // get Question by test id with pagination and optional department filter
 const getQuestionsByTestId = async (
   testId: string,
-  input: { page?: number; limit?: number; searchTerm?: string },
+  input: {
+    page?: number;
+    limit?: number;
+    searchTerm?: string;
+    subject?: string;
+    subjectId?: string;
+    search?: string;
+  },
   user?: IUser
 ) => {
-  const page = input.searchTerm ? 1 : Number(input.page) || 1;
+  const rawSubjectFilter = (input.subjectId || input.subject || input.searchTerm || input.search)?.trim();
+  const page = rawSubjectFilter ? 1 : Number(input.page) || 1;
   const limit = Number(input.limit) || 20;
   const skip = (page - 1) * limit;
-  const searchTerm = input.searchTerm?.trim();
 
   const test = await Test.findById(testId).select("title examType access faculty").lean();
   if (!test) throw new NotFoundError("Test not found");
@@ -424,21 +431,35 @@ const getQuestionsByTestId = async (
     status: "published",
   };
 
-  if (searchTerm) {
-    const searchRegex = new RegExp(searchTerm, "i");
-    const subject = await Subject.findOne({
-      examType: test.examType,
-      name: { $regex: searchRegex },
-    }).select("_id").lean();
-
-    if (subject) {
-      matchQuery.subject = subject._id;
+  if (
+    rawSubjectFilter &&
+    rawSubjectFilter.toLowerCase() !== "all" &&
+    rawSubjectFilter.toLowerCase() !== "all subjects" &&
+    rawSubjectFilter.toLowerCase() !== "të gjitha lëndët" &&
+    rawSubjectFilter.toLowerCase() !== "te gjitha lendet"
+  ) {
+    if (mongoose.Types.ObjectId.isValid(rawSubjectFilter)) {
+      matchQuery.subject = new mongoose.Types.ObjectId(rawSubjectFilter);
     } else {
-      return {
-        testTitle: test.title,
-        data: [],
-        meta: { total: 0, page, limit, totalPages: 0 },
-      };
+      const searchRegex = new RegExp(rawSubjectFilter, "i");
+      const matchedSubjects = await Subject.find({
+        $or: [
+          { name: { $regex: searchRegex } },
+          { nameInEnglish: { $regex: searchRegex } },
+          { nameInAlbanian: { $regex: searchRegex } },
+          { slug: { $regex: searchRegex } },
+        ],
+      }).select("_id").lean();
+
+      if (matchedSubjects.length > 0) {
+        matchQuery.subject = { $in: matchedSubjects.map((s) => s._id) };
+      } else {
+        return {
+          testTitle: test.title,
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
     }
   }
 
@@ -500,10 +521,14 @@ const getQuestionsByTestId = async (
               questionId: "$_id",
               questionText: 1,
               options: 1,
+              questionImageUrl: { $ifNull: ["$questionImageUrl", null] },
               questionImage: { $ifNull: ["$questionImageUrl", null] },
+              imageUrl: { $ifNull: ["$questionImageUrl", null] },
               year: 1,
               correctOptionIndex: 1,
               explanation: 1,
+              explanationImageUrl: { $ifNull: ["$explanationImageUrl", null] },
+              explanationImage: { $ifNull: ["$explanationImageUrl", null] },
               subject: {
                 $cond: {
                   if: { $gt: [{ $ifNull: ["$subjectDetails", 0] }, 0] },
@@ -542,8 +567,6 @@ const getQuestionsByTestId = async (
   const total = aggregationResult[0]?.metadata[0]?.total || 0;
 
   // ── Dynamic questionRange ──
-  // pagination skip করার আগের সব questions-এ passage position জানতে হবে
-  // তাই আলাদা query দিয়ে পুরো test-এর passage positions বের করো
   const allPassagePositions = await Question.aggregate([
     { $match: matchQuery },
     { $sort: { subject: 1, passage: 1, year: -1, _id: 1 } },
@@ -564,12 +587,31 @@ const getQuestionsByTestId = async (
     }
   });
 
-  // ── Passage rendering ──
-  // প্রথমবার passage → full data, পরে → শুধু questionRange
+  // ── Passage rendering & Option/Subject Image Normalization ──
   let lastProcessedPassageId: string | null = null;
 
   const finalQuestions = rawQuestions.map((q: any) => {
-    const { passageRaw, ...restQuestionData } = q;
+    const { passageRaw, options: rawOptions, subject: rawSubject, ...restQuestionData } = q;
+
+    // Normalize options image fields
+    const options = (rawOptions || []).map((opt: any) => ({
+      text: opt.text || "",
+      imageUrl: opt.imageUrl || null,
+      optionImage: opt.imageUrl || null,
+      optionImageUrl: opt.imageUrl || null,
+    }));
+
+    // Normalize subject with localization
+    let subject = rawSubject;
+    if (rawSubject) {
+      const localizedName = user?.language === "albanian"
+        ? (rawSubject.nameInAlbanian || rawSubject.name)
+        : (rawSubject.nameInEnglish || rawSubject.name);
+      subject = {
+        ...rawSubject,
+        name: localizedName,
+      };
+    }
 
     if (passageRaw && passageRaw._id) {
       const currentPassageId = passageRaw._id.toString();
@@ -584,12 +626,16 @@ const getQuestionsByTestId = async (
         lastProcessedPassageId = currentPassageId;
         return {
           ...restQuestionData,
+          options,
+          subject,
           passage: {
             _id: passageRaw._id,
             passageCode: passageRaw.passageCode,
             title: passageRaw.title,
             content: passageRaw.content,
             passageImageUrl: passageRaw.passageImageUrl,
+            passageImage: passageRaw.passageImageUrl,
+            imageUrl: passageRaw.passageImageUrl,
             questionRange,
           },
         };
@@ -597,19 +643,23 @@ const getQuestionsByTestId = async (
         // same passage — শুধু questionRange
         return {
           ...restQuestionData,
+          options,
+          subject,
           passage: {
             _id: passageRaw._id,
             passageCode: passageRaw.passageCode,
             title: null,
             content: null,
             passageImageUrl: null,
+            passageImage: null,
+            imageUrl: null,
             questionRange,
           },
         };
       }
     }
 
-    return { ...restQuestionData, passage: null };
+    return { ...restQuestionData, options, subject, passage: null };
   });
 
   return {
