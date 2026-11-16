@@ -58,6 +58,18 @@ export const getUserEntitlements = async (
     .sort({ expiryDate: -1, createdAt: -1 })
     .lean();
 
+  // If user has NO active subscription in DB, they are purely a free user!
+  // Choosing a plan via /user/choose-plan only selects the browsing category.
+  if (!activeSubscriptions || activeSubscriptions.length === 0) {
+    return {
+      hasActiveSubscription: false,
+      planStatus: null,
+      purchasedPlans: [],
+      purchasedFaculties: [],
+      subscriptionExpiresAt: null,
+    };
+  }
+
   const purchasedPlansSet = new Set<string>();
   let hasFullAccess = false;
   let latestExpiresAt: Date | null = null;
@@ -84,20 +96,6 @@ export const getUserEntitlements = async (
     } else if (norm === "provime") {
       purchasedPlansSet.add(EXAM_TYPES.ENTRANCE_EXAM);
       if (!primaryPlanStatus) primaryPlanStatus = "provime";
-    }
-  }
-
-  // Also take user.plan into account if set
-  if ((user as any).plan) {
-    const userNorm = normalizePlanStatus((user as any).plan);
-    if (userNorm === "full_access") {
-      hasFullAccess = true;
-    } else if (userNorm === "matura") {
-      purchasedPlansSet.add(EXAM_TYPES.MATURA);
-    } else if (userNorm === "semi_matura") {
-      purchasedPlansSet.add(EXAM_TYPES.SEMI_MATURA);
-    } else if (userNorm === "provime") {
-      purchasedPlansSet.add(EXAM_TYPES.ENTRANCE_EXAM);
     }
   }
 
@@ -142,30 +140,14 @@ export const getUserEntitlements = async (
     };
   }
 
-  // Resolve purchased faculties for provime/full_access
+  // Resolve purchased faculties ONLY for paid provime/full_access subscriptions
   const purchasedFacultiesSet = new Set<string>();
 
-  // 1. From user.purchasedFaculties array
-  const rawPurchasedFaculties = (user as any).purchasedFaculties || [];
-  for (const f of rawPurchasedFaculties) {
-    if (f) {
-      purchasedFacultiesSet.add(f.toString());
-    }
-  }
-
-  // 2. From user.faculty field (string name or ObjectId)
-  if (user.faculty) {
-    const rawFaculty = user.faculty.toString().trim();
-    if (Types.ObjectId.isValid(rawFaculty)) {
-      purchasedFacultiesSet.add(rawFaculty);
-    } else {
-      const facultyDoc = await Faculty.findOne({
-        name: { $regex: new RegExp(`^${rawFaculty.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-      })
-        .select("_id")
-        .lean();
-      if (facultyDoc) {
-        purchasedFacultiesSet.add(facultyDoc._id.toString());
+  if (purchasedPlans.includes(EXAM_TYPES.ENTRANCE_EXAM) || hasFullAccess) {
+    const rawPurchasedFaculties = (user as any).purchasedFaculties || [];
+    for (const f of rawPurchasedFaculties) {
+      if (f) {
+        purchasedFacultiesSet.add(f.toString());
       }
     }
   }

@@ -168,18 +168,20 @@ const getUserProfile = async (user: IUser) => {
 const choosePlan = async (user: IUser, payload: { plan: string, faculty?: string }) => {
   user.plan = payload.plan;
   if (payload.plan === 'provime' && payload.faculty) {
-    const facultyDoc = await Faculty.findById(payload.faculty);
+    let facultyDoc = null;
+    if (Types.ObjectId.isValid(payload.faculty)) {
+      facultyDoc = await Faculty.findById(payload.faculty);
+    } else {
+      facultyDoc = await Faculty.findOne({
+        name: { $regex: new RegExp(`^${payload.faculty.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }
+      });
+    }
     if (!facultyDoc) {
-      throw new BadRequestError('Faculty not found with the provided ID.');
+      throw new BadRequestError('Faculty not found with the provided ID or name.');
     }
     user.faculty = facultyDoc.name;
-    if (!user.purchasedFaculties) {
-      user.purchasedFaculties = [];
-    }
-    const facultyObjId = facultyDoc._id as Types.ObjectId;
-    if (!user.purchasedFaculties.some((id: any) => id.toString() === facultyObjId.toString())) {
-      user.purchasedFaculties.push(facultyObjId);
-    }
+    // Note: choosePlan is only selecting the target browsing category/faculty.
+    // It does NOT purchase the faculty (purchasedFaculties is only updated upon successful payment verification).
   } else if (payload.plan !== 'provime') {
     user.faculty = undefined;
   }
