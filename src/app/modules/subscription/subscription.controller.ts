@@ -22,6 +22,22 @@ const recordInAppPurchase = asyncHandler(
   }
 );
 
+// ── 1b. App: Verify Subscription with RevenueCat ────────────────────────────
+const verifySubscription = asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req.user as any)._id || (req.user as any).id;
+  const result = await subscriptionService.verifySubscription(
+    userId,
+    req.body
+  );
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: result.message,
+    data: result.data,
+  });
+});
+
 // ── 2. App: Get Current Active Subscription ─────────────────────────────────
 const getMySubscription = asyncHandler(async (req: Request, res: Response) => {
   const userId = (req.user as any)._id || (req.user as any).id;
@@ -82,10 +98,34 @@ const updateSubscriptionStatus = asyncHandler(
   }
 );
 
+// ── 6. RevenueCat Webhook ───────────────────────────────────────────────────
+const handleRevenueCatWebhook = asyncHandler(
+  async (req: Request, res: Response) => {
+    const authHeader =
+      (req.headers.authorization as string) ||
+      (req.headers["x-revenuecat-webhook-auth"] as string) ||
+      "";
+
+    const result = await subscriptionService.handleRevenueCatWebhook(
+      authHeader,
+      req.body
+    );
+
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: result.message || "Webhook processed successfully",
+      data: result,
+    });
+  }
+);
+
 export const subscriptionController = {
   recordInAppPurchase,
+  verifySubscription,
   getMySubscription,
   getSubscriptionOverview,
   getAllSubscriptions,
   updateSubscriptionStatus,
+  handleRevenueCatWebhook,
 };

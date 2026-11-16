@@ -25,8 +25,26 @@ const inAppPurchaseSchema = z.object({
   purchaseToken: z.string().trim().optional(),
   price: z.coerce.number().min(0).optional().default(0),
   currency: z.string().trim().optional().default("EUR"),
+  faculty: z.string().trim().optional(),
+  facultyId: z.string().trim().optional(),
   startDate: z.string().optional(),
   expiryDate: z.string().optional(),
+});
+
+const verifySubscriptionSchema = z.object({
+  appUserId: z.string().trim().optional(),
+  productIdentifier: z.string().trim().optional(),
+  product: z.string().trim().optional(),
+  plan: z.string().trim().optional(),
+  duration: z.string().trim().optional(),
+  revenueCatCustomerId: z.string().trim().optional(),
+  activeSubscriptions: z.array(z.string()).optional(),
+  latestExpirationDate: z.string().optional(),
+  expiryDate: z.string().optional(),
+  faculty: z.string().trim().optional(),
+  facultyId: z.string().trim().optional(),
+  entitlements: z.record(z.string(), z.any()).optional(),
+  orderId: z.string().trim().optional(),
 });
 
 const updateSubscriptionStatusSchema = z
@@ -66,12 +84,14 @@ const getSubscriptionsQuerySchema = z.object({
 });
 
 export type TInAppPurchasePayload = z.infer<typeof inAppPurchaseSchema>;
+export type TVerifySubscriptionPayload = z.infer<typeof verifySubscriptionSchema>;
 export type TUpdateSubscriptionStatusPayload = z.infer<
   typeof updateSubscriptionStatusSchema
 >;
 
 const subscriptionZodSchema = {
   inAppPurchaseSchema,
+  verifySubscriptionSchema,
   updateSubscriptionStatusSchema,
   getSubscriptionsQuerySchema,
 };

@@ -7,6 +7,28 @@ import subscriptionZodSchema from "./subscription.zod";
 
 const subscriptionRouter = Router();
 
+// ── RevenueCat Real-Time Webhook Endpoint ──────────────────────────────────
+/**
+ * @route   POST /api/v1/subscription/revenuecat-webhook
+ * @desc    Receive and process real-time RevenueCat lifecycle events (renewals, cancellations, expirations)
+ * @access  Public / Server-to-Server (Protected by Secret Authorization Header)
+ */
+subscriptionRouter.post(
+  "/revenuecat-webhook",
+  subscriptionController.handleRevenueCatWebhook
+);
+
+// Convenient alias routes
+subscriptionRouter.post(
+  "/revenuecat",
+  subscriptionController.handleRevenueCatWebhook
+);
+
+subscriptionRouter.post(
+  "/webhook",
+  subscriptionController.handleRevenueCatWebhook
+);
+
 // ── Mobile App Developer Endpoints (In-App Purchase Sync) ───────────────────
 /**
  * @route   POST /api/v1/subscription/in-app-purchase
@@ -20,6 +42,20 @@ subscriptionRouter.post(
     body: subscriptionZodSchema.inAppPurchaseSchema,
   }),
   subscriptionController.recordInAppPurchase
+);
+
+/**
+ * @route   POST /api/v1/subscription/verify-subscription
+ * @desc    Verify mobile in-app purchase with RevenueCat and upgrade user
+ * @access  Authenticated Students & Admins
+ */
+subscriptionRouter.post(
+  "/verify-subscription",
+  authMiddleware(USER_ROLE.STUDENT, USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
+  validateRequest({
+    body: subscriptionZodSchema.verifySubscriptionSchema,
+  }),
+  subscriptionController.verifySubscription
 );
 
 /**

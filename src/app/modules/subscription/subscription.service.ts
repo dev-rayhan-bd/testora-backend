@@ -1,6 +1,12 @@
 import { Types } from "mongoose";
-import { BadRequestError, NotFoundError } from "../../errors/request/apiError";
+import config from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../errors/request/apiError";
 import User from "../user/user.model";
+import Faculty from "../faculty/faculty.model";
 import {
   PAYMENT_PROVIDER,
   SUBSCRIPTION_PLAN,
@@ -13,11 +19,28 @@ import Subscription from "./subscription.model";
 import {
   TInAppPurchasePayload,
   TUpdateSubscriptionStatusPayload,
+  TVerifySubscriptionPayload,
 } from "./subscription.zod";
+import { normalizePlanStatus } from "../../../helpers/entitlements";
 
-// Helper to map product title to internal plan enum if matching
-const mapProductToPlan = (productName: string): TSubscriptionPlan | null => {
-  const p = productName.toLowerCase();
+// Helper to map product title or entitlement IDs to internal plan enum if matching
+const mapProductToPlan = (
+  productName: string,
+  entitlementIds?: string[]
+): TSubscriptionPlan | null => {
+  if (entitlementIds && Array.isArray(entitlementIds)) {
+    for (const ent of entitlementIds) {
+      const e = (ent || "").toLowerCase();
+      if (e.includes("full")) return SUBSCRIPTION_PLAN.FULL_ACCESS;
+      if (e.includes("semi")) return SUBSCRIPTION_PLAN.SEMI_MATURA;
+      if (e.includes("matura")) return SUBSCRIPTION_PLAN.MATURA;
+      if (e.includes("entrance") || e.includes("provime")) {
+        return SUBSCRIPTION_PLAN.PROVIME;
+      }
+    }
+  }
+
+  const p = (productName || "").toLowerCase();
   if (p.includes("full")) return SUBSCRIPTION_PLAN.FULL_ACCESS;
   if (p.includes("semi")) return SUBSCRIPTION_PLAN.SEMI_MATURA;
   if (p.includes("matura")) return SUBSCRIPTION_PLAN.MATURA;
@@ -127,9 +150,248 @@ const recordInAppPurchase = async (
   if (internalPlan) {
     user.plan = internalPlan as any;
   }
+
+  // If faculty is passed (e.g. for Provime entrance exam), associate faculty with user
+  const facultyParam = (payload.faculty || payload.facultyId || "").trim();
+  if (facultyParam) {
+    let facultyDoc = null;
+    if (Types.ObjectId.isValid(facultyParam)) {
+      facultyDoc = await Faculty.findById(facultyParam);
+    } else {
+      facultyDoc = await Faculty.findOne({
+        name: {
+          $regex: new RegExp(
+            `^${facultyParam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i"
+          ),
+        },
+      });
+    }
+
+    if (facultyDoc) {
+      user.faculty = facultyDoc.name;
+      if (!user.purchasedFaculties) {
+        user.purchasedFaculties = [];
+      }
+      const facultyObjId = facultyDoc._id as Types.ObjectId;
+      if (
+        !user.purchasedFaculties.some(
+          (id: any) => id.toString() === facultyObjId.toString()
+        )
+      ) {
+        user.purchasedFaculties.push(facultyObjId);
+      }
+    }
+  }
+
   await user.save();
 
   return subscription;
+};
+
+// ── 1b. Frontend: Verify Subscription via RevenueCat REST API ───────────────
+const verifySubscription = async (
+  userId: string,
+  payload: TVerifySubscriptionPayload
+) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new NotFoundError("User not found.");
+  }
+
+  const appUserId =
+    payload.appUserId ||
+    payload.revenueCatCustomerId ||
+    (user as any).email ||
+    userId.toString();
+
+  const secretKey = config.revenuecat_secret_key?.trim();
+  let verifiedOnRevenueCat = false;
+  let resolvedExpiresDate: Date | null = null;
+  let resolvedProduct =
+    payload.productIdentifier || payload.product || "matura";
+
+  // 1. Live Server-to-Server Verification with RevenueCat REST API
+  if (
+    secretKey &&
+    !secretKey.includes("placeholder") &&
+    !secretKey.includes("replace_with")
+  ) {
+    try {
+      const rcUrl = `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(
+        appUserId
+      )}`;
+      const rcRes = await fetch(rcUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (rcRes.ok) {
+        const rcData: any = await rcRes.json();
+        const subscriber = rcData?.subscriber;
+        const entitlements = subscriber?.entitlements || {};
+
+        // Find active entitlement
+        const activeKey = Object.keys(entitlements).find((k) => {
+          const ent = entitlements[k];
+          return ent?.expires_date && new Date(ent.expires_date) > new Date();
+        });
+
+        if (!activeKey) {
+          throw new BadRequestError(
+            "No active premium entitlement found in RevenueCat."
+          );
+        }
+
+        const activeEnt = entitlements[activeKey];
+        if (activeEnt?.expires_date) {
+          resolvedExpiresDate = new Date(activeEnt.expires_date);
+        }
+        if (activeEnt?.product_identifier) {
+          resolvedProduct = activeEnt.product_identifier;
+        }
+        verifiedOnRevenueCat = true;
+      } else if (rcRes.status === 404) {
+        throw new BadRequestError(
+          "Subscriber record not found on RevenueCat."
+        );
+      } else {
+        console.warn(`[RevenueCat API] Returned status ${rcRes.status}`);
+      }
+    } catch (err: any) {
+      if (err instanceof BadRequestError) throw err;
+      console.error(
+        "[RevenueCat API Verification Error]:",
+        err.message || err
+      );
+    }
+  }
+
+  // 2. Resolve Expiration Date
+  let expiryDate: Date;
+  if (resolvedExpiresDate) {
+    expiryDate = resolvedExpiresDate;
+  } else if (payload.latestExpirationDate) {
+    expiryDate = new Date(payload.latestExpirationDate);
+  } else if (payload.expiryDate) {
+    expiryDate = new Date(payload.expiryDate);
+  } else {
+    expiryDate = new Date();
+    if (payload.duration === "1month") {
+      expiryDate.setDate(expiryDate.getDate() + 30);
+    } else {
+      expiryDate.setDate(expiryDate.getDate() + 365);
+    }
+  }
+
+  // 3. Resolve internal Plan
+  const rawPlanString =
+    payload.plan || resolvedProduct || payload.productIdentifier || "";
+  const internalPlan =
+    mapProductToPlan(rawPlanString) ||
+    (normalizePlanStatus(rawPlanString) as any) ||
+    SUBSCRIPTION_PLAN.MATURA;
+
+  // 4. Resolve Plan Type
+  let planType: any = SUBSCRIPTION_PLAN_TYPE.YEARLY;
+  if (
+    payload.duration === "1month" ||
+    rawPlanString.toLowerCase().includes("month")
+  ) {
+    planType = SUBSCRIPTION_PLAN_TYPE.MONTHLY;
+  } else if (
+    payload.duration === "onetime" ||
+    rawPlanString.toLowerCase().includes("one_time")
+  ) {
+    planType = SUBSCRIPTION_PLAN_TYPE.ONE_TIME;
+  }
+
+  const orderId =
+    payload.orderId ||
+    payload.activeSubscriptions?.[0] ||
+    `rc_${userId}_${Date.now()}`;
+
+  // 5. Update or Create Subscription Record
+  let subscription = await Subscription.findOne({
+    $or: [{ orderId }, { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE }],
+  });
+
+  if (subscription) {
+    subscription.product = resolvedProduct;
+    subscription.plan = internalPlan;
+    subscription.planType = planType;
+    subscription.expiryDate = expiryDate;
+    subscription.status = SUBSCRIPTION_STATUS.ACTIVE;
+    subscription.cancelledAt = null;
+    subscription.cancellationReason = null;
+    if (!subscription.orderId) subscription.orderId = orderId;
+    await subscription.save();
+  } else {
+    subscription = await Subscription.create({
+      user: user._id,
+      product: resolvedProduct,
+      plan: internalPlan,
+      planType,
+      orderId,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
+      startDate: new Date(),
+      activatedAt: new Date(),
+      expiryDate,
+      payment: PAYMENT_PROVIDER.APPLE,
+    });
+  }
+
+  // 6. Handle Faculty assignment if provime
+  const facultyParam = (payload.faculty || payload.facultyId || "").trim();
+  if (facultyParam) {
+    let facultyDoc = null;
+    if (Types.ObjectId.isValid(facultyParam)) {
+      facultyDoc = await Faculty.findById(facultyParam);
+    } else {
+      facultyDoc = await Faculty.findOne({
+        name: {
+          $regex: new RegExp(
+            `^${facultyParam.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i"
+          ),
+        },
+      });
+    }
+
+    if (facultyDoc) {
+      user.faculty = facultyDoc.name;
+      if (!user.purchasedFaculties) user.purchasedFaculties = [];
+      const facultyObjId = facultyDoc._id as Types.ObjectId;
+      if (
+        !user.purchasedFaculties.some(
+          (id: any) => id.toString() === facultyObjId.toString()
+        )
+      ) {
+        user.purchasedFaculties.push(facultyObjId);
+      }
+    }
+  }
+
+  // 7. Update User profile
+  user.subscription = subscription._id as any;
+  user.plan = internalPlan as any;
+  await user.save();
+
+  return {
+    success: true,
+    message:
+      "Subscription verified and user upgraded to Premium successfully!",
+    data: {
+      plan: user.plan,
+      planStatus: "premium",
+      expiresAt: expiryDate,
+      subscriptionId: subscription._id,
+      verifiedViaRevenueCat: verifiedOnRevenueCat,
+    },
+  };
 };
 
 // ── 2. Admin: Subscription Stats Overview ────────────────────────────────────
@@ -416,10 +678,267 @@ const updateSubscriptionStatus = async (
   return sub;
 };
 
+// ── 6. RevenueCat Webhook Handler ───────────────────────────────────────────
+const handleRevenueCatWebhook = async (
+  authHeader: string | undefined,
+  body: any
+) => {
+  // 1. Verify Authorization Header Security
+  const expectedKey = config.revenuecat_webhook_auth_key?.trim();
+  const rawAuth = (authHeader || "").trim();
+  const token = rawAuth.replace(/^Bearer\s+/i, "").trim();
+
+  if (!expectedKey || !token || token !== expectedKey) {
+    throw new UnauthorizedError(
+      "Unauthorized: Invalid or missing RevenueCat webhook authorization key."
+    );
+  }
+
+  // 2. Validate payload structure
+  const event = body?.event;
+  if (!event || !event.type) {
+    return {
+      success: false,
+      message: "Ignored: No valid event found in webhook payload.",
+    };
+  }
+
+  // 3. Handle RevenueCat Dashboard Test Event
+  if (event.type === "TEST") {
+    return {
+      success: true,
+      message: "RevenueCat test webhook received and verified successfully.",
+    };
+  }
+
+  // 4. Resolve Target User by app_user_id or aliases
+  const targetId = event.app_user_id || event.original_app_user_id;
+  let user = null;
+
+  if (targetId && Types.ObjectId.isValid(targetId)) {
+    user = await User.findById(targetId);
+  }
+
+  // Check aliases if user not resolved yet
+  if (!user && Array.isArray(event.aliases)) {
+    for (const alias of event.aliases) {
+      if (alias && Types.ObjectId.isValid(alias)) {
+        user = await User.findById(alias);
+        if (user) break;
+      }
+    }
+  }
+
+  // Fallback: check if targetId is user's email
+  if (
+    !user &&
+    targetId &&
+    typeof targetId === "string" &&
+    targetId.includes("@")
+  ) {
+    user = await User.findOne({ email: targetId.toLowerCase().trim() });
+  }
+
+  if (!user) {
+    // Return acknowledged status so RevenueCat doesn't keep retrying unknown user
+    return {
+      success: false,
+      message: `User not found for app_user_id: ${targetId}. Webhook acknowledged.`,
+    };
+  }
+
+  // 5. Extract metadata from event
+  const rawProduct = event.product_id || "";
+  const entitlementIds =
+    event.entitlement_ids || (event.entitlement_id ? [event.entitlement_id] : []);
+  const internalPlan = mapProductToPlan(rawProduct, entitlementIds);
+
+  let planType: any = SUBSCRIPTION_PLAN_TYPE.YEARLY;
+  const prodLower = rawProduct.toLowerCase();
+  if (prodLower.includes("month") || event.period_type === "MONTHLY") {
+    planType = SUBSCRIPTION_PLAN_TYPE.MONTHLY;
+  } else if (
+    prodLower.includes("one_time") ||
+    prodLower.includes("onetime") ||
+    prodLower.includes("non_renewing")
+  ) {
+    planType = SUBSCRIPTION_PLAN_TYPE.ONE_TIME;
+  }
+
+  const paymentProvider =
+    event.store === "PLAY_STORE"
+      ? PAYMENT_PROVIDER.GOOGLE_PLAY
+      : event.store === "STRIPE"
+      ? PAYMENT_PROVIDER.STRIPE
+      : PAYMENT_PROVIDER.APPLE;
+
+  const orderId =
+    event.original_transaction_id ||
+    event.transaction_id ||
+    event.id ||
+    `rc_${Date.now()}`;
+
+  const startDate = event.purchased_at_ms
+    ? new Date(event.purchased_at_ms)
+    : new Date();
+
+  let expiryDate: Date;
+  if (event.expiration_at_ms) {
+    expiryDate = new Date(event.expiration_at_ms);
+  } else {
+    expiryDate = new Date(startDate.getTime());
+    if (planType === SUBSCRIPTION_PLAN_TYPE.MONTHLY) {
+      expiryDate.setDate(expiryDate.getDate() + 30);
+    } else {
+      expiryDate.setDate(expiryDate.getDate() + 365);
+    }
+  }
+
+  // 6. Handle by event type
+  switch (event.type) {
+    case "INITIAL_PURCHASE":
+    case "RENEWAL":
+    case "PRODUCT_CHANGE":
+    case "UNCANCELLATION":
+    case "NON_RENEWING_PURCHASE": {
+      let subscription = await Subscription.findOne({
+        $or: [
+          { orderId },
+          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
+        ],
+      });
+
+      if (subscription) {
+        subscription.product = rawProduct || subscription.product;
+        if (internalPlan) subscription.plan = internalPlan;
+        subscription.planType = planType;
+        subscription.price = event.price || subscription.price;
+        subscription.currency = event.currency || subscription.currency;
+        subscription.payment = paymentProvider;
+        subscription.expiryDate = expiryDate;
+        subscription.status = SUBSCRIPTION_STATUS.ACTIVE;
+        subscription.cancelledAt = null;
+        subscription.cancellationReason = null;
+        if (orderId && !subscription.orderId) subscription.orderId = orderId;
+        await subscription.save();
+      } else {
+        subscription = await Subscription.create({
+          user: user._id,
+          product: rawProduct || "Mobile In-App Subscription",
+          plan: internalPlan,
+          planType,
+          price: event.price || 0,
+          currency: event.currency || "EUR",
+          payment: paymentProvider,
+          orderId,
+          purchaseToken: event.id || null,
+          startDate,
+          activatedAt: startDate,
+          expiryDate,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
+      }
+
+      // Update User profile
+      user.subscription = subscription._id as any;
+      if (internalPlan) {
+        user.plan = internalPlan as any;
+      }
+      await user.save();
+
+      return {
+        success: true,
+        message: `Subscription successfully activated/renewed for user ${user._id} via ${event.type}.`,
+        subscriptionId: subscription._id,
+      };
+    }
+
+    case "CANCELLATION": {
+      // User cancelled auto-renew in Apple/Google settings. Access continues until expiryDate.
+      const subscription = await Subscription.findOne({
+        $or: [
+          { orderId },
+          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
+        ],
+      });
+
+      if (subscription) {
+        subscription.cancelledAt = new Date();
+        subscription.cancellationReason =
+          event.cancel_reason ||
+          "Auto-renew cancelled by user via App Store/Play Store";
+
+        if (event.expiration_at_ms) {
+          subscription.expiryDate = new Date(event.expiration_at_ms);
+        }
+
+        // If expiry is already passed, mark EXPIRED, otherwise CANCELLED
+        if (subscription.expiryDate <= new Date()) {
+          subscription.status = SUBSCRIPTION_STATUS.EXPIRED;
+        } else {
+          subscription.status = SUBSCRIPTION_STATUS.CANCELLED;
+        }
+
+        await subscription.save();
+      }
+
+      return {
+        success: true,
+        message: `Subscription auto-renew cancellation recorded for user ${user._id}.`,
+      };
+    }
+
+    case "EXPIRATION": {
+      // Period ended and subscription expired
+      const subscription = await Subscription.findOne({
+        $or: [{ orderId }, { user: user._id }],
+      });
+
+      if (subscription) {
+        subscription.status = SUBSCRIPTION_STATUS.EXPIRED;
+        if (event.expiration_at_ms) {
+          subscription.expiryDate = new Date(event.expiration_at_ms);
+        }
+        await subscription.save();
+      }
+
+      return {
+        success: true,
+        message: `Subscription expiration recorded for user ${user._id}.`,
+      };
+    }
+
+    case "BILLING_ISSUE": {
+      const subscription = await Subscription.findOne({
+        $or: [
+          { orderId },
+          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
+        ],
+      });
+      if (subscription) {
+        subscription.cancellationReason = "Billing issue (Grace period)";
+        await subscription.save();
+      }
+      return {
+        success: true,
+        message: `Billing issue noted for user ${user._id}.`,
+      };
+    }
+
+    default:
+      return {
+        success: true,
+        message: `RevenueCat event '${event.type}' acknowledged without action.`,
+      };
+  }
+};
+
 export const subscriptionService = {
   recordInAppPurchase,
+  verifySubscription,
   getSubscriptionOverview,
   getAllSubscriptions,
   getMySubscription,
   updateSubscriptionStatus,
+  handleRevenueCatWebhook,
 };

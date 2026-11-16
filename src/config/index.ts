@@ -40,6 +40,8 @@ const envSchema = z.object({
   AWS_REGION: z.string().default('us-east-1'),
   AWS_BUCKET_NAME: z.string().optional(),
   STORAGE_DRIVER: z.enum(['auto', 'cloudinary', 's3']).default('auto'),
+  REVENUECAT_WEBHOOK_AUTH_KEY: z.string().optional().default('3d8f1fa1a8df7e01bdb6d04eeb9cd98519e93c688b2f0b84'),
+  REVENUECAT_SECRET_KEY: z.string().optional().default(''),
 });
 
 const envVars = envSchema.parse(process.env);
@@ -77,4 +79,6 @@ export default {
   aws_region: envVars.AWS_REGION,
   aws_bucket_name: envVars.AWS_BUCKET_NAME,
   storage_driver: envVars.STORAGE_DRIVER,
+  revenuecat_webhook_auth_key: envVars.REVENUECAT_WEBHOOK_AUTH_KEY,
+  revenuecat_secret_key: envVars.REVENUECAT_SECRET_KEY,
 };

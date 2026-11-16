@@ -31,6 +31,14 @@ const appRouters = [
     router: subscriptionRouter,
   },
   {
+    path: '/webhooks',
+    router: subscriptionRouter,
+  },
+  {
+    path: '/webhook',
+    router: subscriptionRouter,
+  },
+  {
     path: '/user',
     router: userRouter,
   },

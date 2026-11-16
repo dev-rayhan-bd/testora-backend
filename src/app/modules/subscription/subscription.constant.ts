@@ -2,7 +2,8 @@ export const SUBSCRIPTION_PLAN = {
     MATURA: 'matura',
     SEMI_MATURA: 'semi_matura',
     PROVIME: 'provime',
-    FULL_ACCESS: 'full-access'
+    FULL_ACCESS: 'full_access',
+    FULL_ACCESS_HYPHEN: 'full-access',
 } as const;
 
 export const SUBSCRIPTION_PLAN_TYPE = {

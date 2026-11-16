@@ -53,8 +53,9 @@ export const userSchema = new Schema<IUser>(
     },
     plan: {
       type: String,
-      enum: Object.values(EXAM_TYPES),
-      required: false
+      enum: [...Object.values(EXAM_TYPES), 'full_access', 'full-access', null],
+      required: false,
+      default: null,
     },
     language: {
       type: String,

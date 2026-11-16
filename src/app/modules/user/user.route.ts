@@ -6,6 +6,8 @@ import { userController } from './user.controller';
 import userValidationZodSchema from './user.validations';
 import { uploadFile } from '../../../helpers/fileuploader';
 import { validateFileSizes } from '../../middlewares/validateFileSize';
+import { subscriptionController } from '../subscription/subscription.controller';
+import subscriptionZodSchema from '../subscription/subscription.zod';
 
 const userRouter = Router();
 
@@ -21,6 +23,20 @@ userRouter.post(
   '/choose-plan',
   authMiddleware(USER_ROLE.STUDENT),
   userController.choosePlanIntoDb,
+);
+
+/**
+ * @route   POST /api/v1/user/verify-subscription
+ * @desc    Verify mobile in-app purchase with RevenueCat and upgrade user
+ * @access  Authenticated Students & Admins
+ */
+userRouter.post(
+  '/verify-subscription',
+  authMiddleware(USER_ROLE.STUDENT, USER_ROLE.ADMIN, USER_ROLE.SUPER_ADMIN),
+  validateRequest({
+    body: subscriptionZodSchema.verifySubscriptionSchema,
+  }),
+  subscriptionController.verifySubscription,
 );
 
 
