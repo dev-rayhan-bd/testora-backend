@@ -46,8 +46,8 @@ export const getUserEntitlements = async (
   }
 
   const now = new Date();
-  // Find active subscription that has not expired
-  const activeSubscription = await Subscription.findOne({
+  // Find ALL active subscriptions that have not expired
+  const activeSubscriptions = await Subscription.find({
     user: user._id,
     status: SUBSCRIPTION_STATUS.ACTIVE,
     $or: [
@@ -58,41 +58,88 @@ export const getUserEntitlements = async (
     .sort({ expiryDate: -1, createdAt: -1 })
     .lean();
 
-  if (!activeSubscription) {
-    return {
-      hasActiveSubscription: false,
-      planStatus: null,
-      purchasedPlans: [],
-      purchasedFaculties: [],
-      subscriptionExpiresAt: null,
-    };
+  const purchasedPlansSet = new Set<string>();
+  let hasFullAccess = false;
+  let latestExpiresAt: Date | null = null;
+  let primaryPlanStatus: TStandardizedPlanStatus = null;
+
+  for (const sub of activeSubscriptions) {
+    const exp = sub.expiryDate || (sub as any).endDate;
+    if (exp) {
+      const expDate = new Date(exp);
+      if (!latestExpiresAt || expDate > latestExpiresAt) {
+        latestExpiresAt = expDate;
+      }
+    }
+
+    const norm = normalizePlanStatus(sub.plan);
+    if (norm === "full_access") {
+      hasFullAccess = true;
+    } else if (norm === "matura") {
+      purchasedPlansSet.add(EXAM_TYPES.MATURA);
+      if (!primaryPlanStatus) primaryPlanStatus = "matura";
+    } else if (norm === "semi_matura") {
+      purchasedPlansSet.add(EXAM_TYPES.SEMI_MATURA);
+      if (!primaryPlanStatus) primaryPlanStatus = "semi_matura";
+    } else if (norm === "provime") {
+      purchasedPlansSet.add(EXAM_TYPES.ENTRANCE_EXAM);
+      if (!primaryPlanStatus) primaryPlanStatus = "provime";
+    }
   }
 
-  const normalizedPlan = normalizePlanStatus(activeSubscription.plan || (user as any).plan);
-
-  if (!normalizedPlan) {
-    return {
-      hasActiveSubscription: false,
-      planStatus: null,
-      purchasedPlans: [],
-      purchasedFaculties: [],
-      subscriptionExpiresAt: null,
-    };
+  // Also take user.plan into account if set
+  if ((user as any).plan) {
+    const userNorm = normalizePlanStatus((user as any).plan);
+    if (userNorm === "full_access") {
+      hasFullAccess = true;
+    } else if (userNorm === "matura") {
+      purchasedPlansSet.add(EXAM_TYPES.MATURA);
+    } else if (userNorm === "semi_matura") {
+      purchasedPlansSet.add(EXAM_TYPES.SEMI_MATURA);
+    } else if (userNorm === "provime") {
+      purchasedPlansSet.add(EXAM_TYPES.ENTRANCE_EXAM);
+    }
   }
 
   let purchasedPlans: string[] = [];
-  if (normalizedPlan === "full_access") {
+  let planStatus: TStandardizedPlanStatus = null;
+
+  if (hasFullAccess) {
     purchasedPlans = [
       EXAM_TYPES.MATURA,
       EXAM_TYPES.SEMI_MATURA,
       EXAM_TYPES.ENTRANCE_EXAM,
-    ]; // ["matura", "semi_matura", "provime"]
-  } else if (normalizedPlan === "matura") {
-    purchasedPlans = [EXAM_TYPES.MATURA];
-  } else if (normalizedPlan === "semi_matura") {
-    purchasedPlans = [EXAM_TYPES.SEMI_MATURA];
-  } else if (normalizedPlan === "provime") {
-    purchasedPlans = [EXAM_TYPES.ENTRANCE_EXAM];
+    ];
+    planStatus = "full_access";
+  } else {
+    purchasedPlans = Array.from(purchasedPlansSet);
+    if (
+      purchasedPlans.includes(EXAM_TYPES.MATURA) &&
+      purchasedPlans.includes(EXAM_TYPES.SEMI_MATURA) &&
+      purchasedPlans.includes(EXAM_TYPES.ENTRANCE_EXAM)
+    ) {
+      planStatus = "full_access";
+    } else if (purchasedPlans.length > 1) {
+      planStatus =
+        normalizePlanStatus((user as any).plan) ||
+        primaryPlanStatus ||
+        "full_access";
+    } else {
+      planStatus =
+        primaryPlanStatus ||
+        normalizePlanStatus((user as any).plan) ||
+        null;
+    }
+  }
+
+  if (purchasedPlans.length === 0) {
+    return {
+      hasActiveSubscription: false,
+      planStatus: null,
+      purchasedPlans: [],
+      purchasedFaculties: [],
+      subscriptionExpiresAt: null,
+    };
   }
 
   // Resolve purchased faculties for provime/full_access
@@ -125,14 +172,12 @@ export const getUserEntitlements = async (
 
   const purchasedFaculties = Array.from(purchasedFacultiesSet);
 
-  const expiresAt = activeSubscription.expiryDate || (activeSubscription as any).endDate;
-
   return {
     hasActiveSubscription: true,
-    planStatus: normalizedPlan,
+    planStatus,
     purchasedPlans,
     purchasedFaculties,
-    subscriptionExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+    subscriptionExpiresAt: latestExpiresAt ? latestExpiresAt.toISOString() : null,
   };
 };
 

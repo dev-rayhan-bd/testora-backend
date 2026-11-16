@@ -138,6 +138,15 @@ const recordInAppPurchase = async (
   // Check if this orderId was already recorded (idempotent / renew)
   let subscription = await Subscription.findOne({ orderId: payload.orderId });
 
+  // If not found by orderId, check if user already has an active subscription for this specific plan
+  if (!subscription && internalPlan) {
+    subscription = await Subscription.findOne({
+      user: user._id,
+      plan: internalPlan,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
+    });
+  }
+
   if (subscription) {
     Object.assign(subscription, subscriptionData);
     await subscription.save();
@@ -314,10 +323,16 @@ const verifySubscription = async (
     payload.activeSubscriptions?.[0] ||
     `rc_${userId}_${Date.now()}`;
 
-  // 5. Update or Create Subscription Record
-  let subscription = await Subscription.findOne({
-    $or: [{ orderId }, { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE }],
-  });
+  // 5. Update or Create Subscription Record per Plan
+  let subscription = await Subscription.findOne({ orderId });
+
+  if (!subscription && internalPlan) {
+    subscription = await Subscription.findOne({
+      user: user._id,
+      plan: internalPlan,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
+    });
+  }
 
   if (subscription) {
     subscription.product = resolvedProduct;
@@ -801,12 +816,15 @@ const handleRevenueCatWebhook = async (
     case "PRODUCT_CHANGE":
     case "UNCANCELLATION":
     case "NON_RENEWING_PURCHASE": {
-      let subscription = await Subscription.findOne({
-        $or: [
-          { orderId },
-          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
-        ],
-      });
+      let subscription = await Subscription.findOne({ orderId });
+
+      if (!subscription && internalPlan) {
+        subscription = await Subscription.findOne({
+          user: user._id,
+          plan: internalPlan,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
+      }
 
       if (subscription) {
         subscription.product = rawProduct || subscription.product;
@@ -855,12 +873,15 @@ const handleRevenueCatWebhook = async (
 
     case "CANCELLATION": {
       // User cancelled auto-renew in Apple/Google settings. Access continues until expiryDate.
-      const subscription = await Subscription.findOne({
-        $or: [
-          { orderId },
-          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
-        ],
-      });
+      let subscription = await Subscription.findOne({ orderId });
+
+      if (!subscription && internalPlan) {
+        subscription = await Subscription.findOne({
+          user: user._id,
+          plan: internalPlan,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
+      }
 
       if (subscription) {
         subscription.cancelledAt = new Date();
@@ -890,9 +911,14 @@ const handleRevenueCatWebhook = async (
 
     case "EXPIRATION": {
       // Period ended and subscription expired
-      const subscription = await Subscription.findOne({
-        $or: [{ orderId }, { user: user._id }],
-      });
+      let subscription = await Subscription.findOne({ orderId });
+
+      if (!subscription && internalPlan) {
+        subscription = await Subscription.findOne({
+          user: user._id,
+          plan: internalPlan,
+        });
+      }
 
       if (subscription) {
         subscription.status = SUBSCRIPTION_STATUS.EXPIRED;
@@ -909,12 +935,16 @@ const handleRevenueCatWebhook = async (
     }
 
     case "BILLING_ISSUE": {
-      const subscription = await Subscription.findOne({
-        $or: [
-          { orderId },
-          { user: user._id, status: SUBSCRIPTION_STATUS.ACTIVE },
-        ],
-      });
+      let subscription = await Subscription.findOne({ orderId });
+
+      if (!subscription && internalPlan) {
+        subscription = await Subscription.findOne({
+          user: user._id,
+          plan: internalPlan,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
+      }
+
       if (subscription) {
         subscription.cancellationReason = "Billing issue (Grace period)";
         await subscription.save();
